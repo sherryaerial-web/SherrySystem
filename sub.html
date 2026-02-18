@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>代課邀約清單</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; background: #fdf2f2; padding: 20px; }
+    .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+    .course-item { border-bottom: 1px solid #eee; padding: 15px 0; display: flex; align-items: center; }
+    .course-item input { transform: scale(1.5); margin-right: 15px; }
+    .btn { width: 100%; padding: 15px; border-radius: 10px; border: none; font-size: 18px; font-weight: bold; margin-top: 20px; cursor: pointer; }
+    .accept { background: #4caf50; color: white; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2 id="welcome">老師您好！</h2>
+    <p>以下是 Sherry 邀請您代課的時段，請勾選您可以承接的課程：</p>
+    <div id="list">讀取課程中...</div>
+    <button class="btn accept" onclick="submitClaim()">確認提交勾選課程</button>
+  </div>
+
+  <script>
+    const APP_URL = "妳的GAS網址";
+    const params = new URLSearchParams(window.location.search);
+    const teacherName = params.get('name');
+    const ids = params.get('ids').split(',');
+
+    document.getElementById('welcome').innerText = `${teacherName} 老師您好！`;
+
+    // 抓取對應的課程資料
+    fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r => r.json()).then(data => {
+      const filtered = data.filter(d => ids.includes(String(d.rowId)));
+      document.getElementById('list').innerHTML = filtered.map(c => `
+        <div class="course-item">
+          <input type="checkbox" class="claim-chk" value="${c.rowId}">
+          <div>
+            <strong>${new Date(c['日期']).toLocaleDateString()} ${c['時間']}</strong><br>
+            <span>${c['課程']} (原師：${c['指導者']})</span>
+          </div>
+        </div>`).join('');
+    });
+
+    function submitClaim() {
+      const selectedIds = Array.from(document.querySelectorAll('.claim-chk:checked')).map(el => el.value);
+      if (selectedIds.length === 0) return alert("請至少勾選一堂課，或直接回覆 Sherry 喔！");
+      
+      // 批次更新回 GAS
+      Promise.all(selectedIds.map(id => 
+        fetch(`${APP_URL}?action=updateStatus&rowId=${id}&status=已成交&subTeacher=${teacherName}`)
+      )).then(() => {
+        alert("認領完成！感謝老師幫忙！");
+        window.close();
+      });
+    }
+  </script>
+</body>
+</html>
