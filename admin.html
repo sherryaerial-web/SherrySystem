@@ -2,31 +2,30 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Sherry 後台調度中心</title>
+  <title>Sherry 後台調度</title>
   <style>
     body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 15px; }
+    .header { position: sticky; top: 0; background: #f0f2f5; z-index: 100; padding: 10px 0; border-bottom: 1px solid #ddd; }
     .card { background: #fff; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); position: relative; }
-    .course-info { margin-left: 35px; }
     .chk-box { position: absolute; left: 15px; top: 18px; transform: scale(1.5); }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 15px 0 10px 0; }
-    .btn { padding: 10px; border-radius: 6px; text-decoration: none; text-align: center; font-size: 13px; font-weight: bold; color: white; cursor: pointer; border: none; }
+    .course-info { margin-left: 40px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
+    .btn { padding: 10px; border-radius: 6px; text-align: center; font-size: 13px; font-weight: bold; color: white; border: none; cursor: pointer; }
     .t1 { background: #ff9800; } .t2 { background: #03a9f4; } .t3 { background: #90a4ae; }
     .other-skill { background: #fff; color: #bbb; border: 1px dashed #ddd; }
-    .header-bar { position: sticky; top: 0; background: #f0f2f5; padding: 10px 0; z-index: 100; border-bottom: 1px solid #ddd; margin-bottom: 15px; }
-    .status-hint { font-size: 12px; color: #666; margin-bottom: 10px; }
+    .status-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #eee; }
   </style>
 </head>
 <body>
-  <div class="header-bar">
+  <div class="header">
     <h2>💎 Sherry 調度中心</h2>
-    <p class="status-hint">步驟：1.勾選左側課程 -> 2.點擊下方老師名字 (自動產生邀約連結)</p>
+    <small>勾選左側課程 → 點選老師名 (自動記錄並複製連結)</small>
   </div>
-  
-  <div id="main">讀取中...</div>
+  <div id="main" style="margin-top:20px;">讀取中...</div>
 
   <script>
-    const APP_URL = "妳的GAS網址"; 
-    let teachers = []; let courses = [];
+    const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec"; 
+    let teachers = [], courses = [];
 
     window.onload = () => {
       Promise.all([
@@ -41,32 +40,25 @@
 
     function render() {
       const main = document.getElementById('main');
-      if(courses.length===0) { main.innerHTML='<div style="text-align:center; padding:50px;">目前沒有待處理申請</div>'; return; }
+      if(courses.length===0) { main.innerHTML='<div style="text-align:center; padding:50px;">暫無待處理請假</div>'; return; }
       
-      main.innerHTML = courses.map((c, i) => {
-        let type = "其他"; 
-        if (c['課程'].includes('空瑜')) type = '空瑜';
-        else if (c['課程'].includes('空環')) type = '空環';
-        else if (c['課程'].includes('舞綢')) type = '舞綢';
-
-        // 依專長與梯次排序老師
-        const sortedT = [...teachers].sort((a,b) => {
-          const am = a['專長'].includes(type) || a['專長'].includes('全能');
-          const bm = b['專長'].includes(type) || b['專長'].includes('全能');
-          return bm - am;
-        });
+      main.innerHTML = courses.map(c => {
+        let type = c['課程'].includes('空瑜') ? '空瑜' : (c['課程'].includes('空環') ? '空環' : (c['課程'].includes('舞綢') ? '舞綢' : '其他'));
+        const sortedT = [...teachers].sort((a,b) => (b['專長'].includes(type) || b['專長'].includes('全能')) - (a['專長'].includes(type) || a['專長'].includes('全能')));
 
         return `
           <div class="card">
             <input type="checkbox" class="course-chk chk-box" value="${c.rowId}">
             <div class="course-info">
-              <strong>${new Date(c['日期']).toLocaleDateString()} ${c['時間']}</strong><br>
+              <strong>${new Date(c['日期']).toLocaleDateString('zh-TW')} ${c['時間']}</strong> 
+              <span class="status-badge">${c['狀態'] || '徵求中'}</span><br>
               ${c['課程']} (原師：${c['指導者']})
+              ${c['最後詢問對象'] ? `<br><small style="color:blue">最後詢問：${c['最後詢問對象']}</small>` : ''}
             </div>
             <div class="grid">${sortedT.map(t => {
               const isMatch = t['專長'].includes(type) || t['專長'].includes('全能');
-              return `<button class="btn ${isMatch ? t['梯次'] : 'other-skill'}" 
-                      onclick="generateLink('${t['指導者']}')">${isMatch ? '' : '(跨)'}${t['指導者']}</button>`;
+              return `<button class="btn ${isMatch ? t['梯次'] : 'other-skill'}" onclick="generateLink('${t['指導者']}')">
+                ${isMatch ? '' : '(跨)'}${t['指導者']}</button>`;
             }).join('')}</div>
           </div>`;
       }).join('');
@@ -74,17 +66,20 @@
 
     function generateLink(tName) {
       const selectedIds = Array.from(document.querySelectorAll('.course-chk:checked')).map(el => el.value);
-      if (selectedIds.length === 0) return alert("請先勾選想要請這位老師代的課程！");
+      if (selectedIds.length === 0) return alert("請先勾選課程！");
       
-      // 產出 sub.html 的網址
       const subUrl = window.location.href.replace('admin.html', 'sub.html');
       const finalUrl = `${subUrl}?name=${encodeURIComponent(tName)}&ids=${selectedIds.join(',')}`;
       
-      const msg = `老師您好，想請問這幾堂課您方便代課嗎？\n點擊連結查看並回覆：\n${finalUrl}`;
-      
-      // 複製到剪貼簿
-      navigator.clipboard.writeText(msg).then(() => {
-        alert(`已勾選 ${selectedIds.length} 堂課！\n已為 ${tName} 老師產生專屬連結並複製好囉，直接去 LINE 貼上即可！`);
+      // 記錄詢問狀態
+      Promise.all(selectedIds.map(id => 
+        fetch(`${APP_URL}?action=updateStatus&rowId=${id}&status=詢問中&lastTeacher=${encodeURIComponent(tName)}`)
+      )).then(() => {
+        const msg = `老師您好，想請問這幾堂課您方便代課嗎？\n點擊連結查看並回覆：\n${finalUrl}`;
+        navigator.clipboard.writeText(msg).then(() => {
+          alert(`已標記為詢問 ${tName} 中！連結已複製，請至 LINE 貼上。`);
+          location.reload();
+        });
       });
     }
   </script>
