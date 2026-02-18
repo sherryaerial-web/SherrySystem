@@ -4,12 +4,12 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Sherry Aerial 請假系統</title>
   <style>
-    body { font-family: -apple-system, sans-serif; background: #f8f9fa; padding: 20px; color: #333; }
+    body { font-family: -apple-system, sans-serif; background: #f8f9fa; padding: 15px; color: #333; }
     .card { background: #fff; padding: 20px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    h2 { color: #455a64; margin-top: 0; }
+    h2 { color: #455a64; margin-top: 0; font-size: 1.2rem; border-left: 5px solid #455a64; padding-left: 10px; }
     select, button { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; }
-    button { background: #455a64; color: white; border: none; font-weight: bold; cursor: pointer; }
-    .course-item { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
+    button.submit-btn { background: #455a64; color: white; border: none; font-weight: bold; cursor: pointer; }
+    .course-item { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
     .course-item input { margin-right: 15px; transform: scale(1.3); }
     .status-tag { padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
   </style>
@@ -17,9 +17,9 @@
 <body>
   <div class="card">
     <h2>👋 老師請假登記</h2>
-    <select id="teacherSelect"><option value="">請選擇您的名字</option></select>
+    <select id="teacherSelect"><option value="">讀取名單中...</option></select>
     <div id="courseList">讀取課程中...</div>
-    <button onclick="submitSub()">提交請假申請</button>
+    <button class="submit-btn" onclick="submitLeave()">提交請假申請</button>
   </div>
 
   <div class="card">
@@ -31,17 +31,19 @@
     const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec"; 
 
     window.onload = () => {
+      // 載入老師名單
       fetch(`${APP_URL}?action=getTeachers`).then(r => r.json()).then(data => {
-        document.getElementById('teacherSelect').innerHTML += data.map(t => `<option value="${t['指導者']}">${t['指導者']}</option>`).join('');
+        const select = document.getElementById('teacherSelect');
+        select.innerHTML = '<option value="">請選擇您的名字</option>' + 
+          data.map(t => `<option value="${t['指導者']}">${t['指導者']}</option>`).join('');
       });
+      // 載入課程
       fetch(`${APP_URL}?action=getCourse`).then(r => r.json()).then(data => {
-        document.getElementById('courseList').innerHTML = data.map((c,i) => `
+        document.getElementById('courseList').innerHTML = data.map(c => `
           <div class="course-item">
             <input type="checkbox" class="chk" value='${JSON.stringify(c)}'>
-            <div>
-            <strong>${new Date(c['日期']).toLocaleDateString('zh-TW')}</strong><br>
-            <small>${new Date(c['時間']).toLocaleTimeString('zh-TW', {hour: '2-digit', minute:'2-digit', hour12: false})} ${c['課程']}</small>
-            </div>
+            <div><strong>${new Date(c['日期']).toLocaleDateString('zh-TW')}</strong><br>
+            <small>${c['時間']} ${c['課程']}</small></div>
           </div>`).join('');
       });
       renderBoard();
@@ -52,20 +54,20 @@
         const items = data.filter(d => d['指導者'] !== "指導者").slice(-15).reverse();
         document.getElementById('board').innerHTML = items.map(l => `
           <div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee; align-items:center;">
-            <div><strong>${l['日期']} ${l['課程']}</strong><br><small>${l['指導者']} 老師</small></div>
+            <div><strong>${new Date(l['日期']).toLocaleDateString('zh-TW')} ${l['課程']}</strong><br><small>${l['指導者']} 老師</small></div>
             <span class="status-tag" style="background:${l['代課老師']?'#e8f5e9':'#fff3e0'}; color:${l['代課老師']?'#2e7d32':'#ef6c00'};">
-              ${l['代課老師'] ? '✅ 已結案' : '⏳ 處理中'}
+              ${l['代課老師'] ? '✅ 已結案' : (l['狀態'] === '詢問中' ? '⏳ 洽詢中' : '❓ 徵求中')}
             </span>
           </div>`).join('');
       });
     }
 
-    function submitSub() {
+    function submitLeave() {
       const name = document.getElementById('teacherSelect').value;
       const selected = Array.from(document.querySelectorAll('.chk:checked')).map(el => JSON.parse(el.value));
       if (!name || selected.length === 0) return alert("請選擇名字與課程");
       fetch(`${APP_URL}?instructor=${name}&items=${encodeURIComponent(JSON.stringify(selected))}`)
-        .then(() => { alert("申請已送出！"); location.reload(); });
+        .then(() => { alert("申請成功！已放入看板"); location.reload(); });
     }
   </script>
 </body>
