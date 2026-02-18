@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sherry 後台調度</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 15px; }
+    .card { background: #fff; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+    .btn { padding: 10px; border-radius: 6px; text-decoration: none; text-align: center; font-size: 13px; font-weight: bold; color: white; }
+    .t1 { background: #ff9800; } .t2 { background: #03a9f4; } .t3 { background: #90a4ae; }
+    .other-skill { background: #fff; color: #bbb; border: 1px dashed #ddd; }
+    .op-bar { display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #eee; padding-top: 10px; }
+    .op-btn { border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>💎 代課調度中心</h2>
+  <div id="main">讀取中...</div>
+
+  <script>
+    const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec"; 
+    let teachers = []; let courses = [];
+
+    window.onload = () => {
+      Promise.all([
+        fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r=>r.json()), 
+        fetch(`${APP_URL}?action=getTeachers`).then(r=>r.json())
+      ]).then(([cData, tData]) => {
+        courses = cData.filter(d => d['指導者'] !== "指導者" && !d['代課老師']);
+        teachers = tData;
+        render();
+      });
+    };
+
+    function render() {
+      const main = document.getElementById('main');
+      if(courses.length===0) { main.innerHTML='<div style="text-align:center; padding:50px;">目前沒有待處理申請</div>'; return; }
+      
+      main.innerHTML = courses.map((c, i) => {
+        let type = "其他"; 
+        if (c['課程'].includes('空瑜')) type = '空瑜';
+        else if (c['課程'].includes('空環')) type = '空環';
+        else if (c['課程'].includes('舞綢')) type = '舞綢';
+
+        const sortedT = [...teachers].sort((a,b) => {
+          const am = a['專長'].includes(type) || a['專長'].includes('全能');
+          const bm = b['專長'].includes(type) || b['專長'].includes('全能');
+          return bm - am;
+        });
+
+        const msg = encodeURIComponent(`【Sherry 代課徵求】\n日期：${c['日期']}\n課程：${c['課程']}\n時間：${c['時間']}\n請問您有空代課嗎？`);
+
+        return `
+          <div class="card">
+            <strong>${c['日期']} ${c['時間']}</strong><br>${c['課程']} (${c['指導者']})
+            <div class="grid">${sortedT.map(t => {
+              const isMatch = t['專長'].includes(type) || t['專長'].includes('全能');
+              return `<a href="https://line.me/R/msg/text/?${msg}" target="_blank" class="btn ${isMatch ? t['梯次'] : 'other-skill'}" 
+                      onclick="update(${c.rowId},'詢問中','','${t['指導者']}')">${isMatch ? '' : '(跨)'}${t['指導者']}</a>`;
+            }).join('')}</div>
+            <div class="op-bar">
+              <button class="op-btn" style="background:#ffebee;color:#f44336" onclick="update(${c.rowId},'已婉拒')">婉拒</button>
+              <button class="op-btn" style="background:#e8f5e9;color:#2e7d32" onclick="update(${c.rowId},'已成交',true)">成交領取</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function update(rowId, status, isSuccess, lastT) {
+      let url = `${APP_URL}?action=updateStatus&rowId=${rowId}&status=${status}`;
+      if(lastT) url += `&lastTeacher=${lastT}`;
+      if(isSuccess) {
+        const name = prompt("是哪位老師代課？");
+        if(!name) return;
+        url += `&subTeacher=${name}`;
+      }
+      fetch(url).then(() => { if(isSuccess || status==='已婉拒') location.reload(); });
+    }
+  </script>
+</body>
+</html>
