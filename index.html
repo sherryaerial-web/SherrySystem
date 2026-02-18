@@ -38,7 +38,10 @@
         document.getElementById('courseList').innerHTML = data.map((c,i) => `
           <div class="course-item">
             <input type="checkbox" class="chk" value='${JSON.stringify(c)}'>
-            <div><strong>${c['日期']}</strong><br><small>${c['時間']} ${c['課程']}</small></div>
+            <div>
+            <strong>${new Date(c['日期']).toLocaleDateString('zh-TW')}</strong><br>
+            <small>${new Date(c['時間']).toLocaleTimeString('zh-TW', {hour: '2-digit', minute:'2-digit', hour12: false})} ${c['課程']}</small>
+            </div>
           </div>`).join('');
       });
       renderBoard();
