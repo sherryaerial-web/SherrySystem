@@ -2,24 +2,30 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Sherry 後台調度</title>
+  <title>Sherry 後台調度中心</title>
   <style>
     body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 15px; }
-    .card { background: #fff; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
-    .btn { padding: 10px; border-radius: 6px; text-decoration: none; text-align: center; font-size: 13px; font-weight: bold; color: white; }
+    .card { background: #fff; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); position: relative; }
+    .course-info { margin-left: 35px; }
+    .chk-box { position: absolute; left: 15px; top: 18px; transform: scale(1.5); }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 15px 0 10px 0; }
+    .btn { padding: 10px; border-radius: 6px; text-decoration: none; text-align: center; font-size: 13px; font-weight: bold; color: white; cursor: pointer; border: none; }
     .t1 { background: #ff9800; } .t2 { background: #03a9f4; } .t3 { background: #90a4ae; }
     .other-skill { background: #fff; color: #bbb; border: 1px dashed #ddd; }
-    .op-bar { display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #eee; padding-top: 10px; }
-    .op-btn { border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; }
+    .header-bar { position: sticky; top: 0; background: #f0f2f5; padding: 10px 0; z-index: 100; border-bottom: 1px solid #ddd; margin-bottom: 15px; }
+    .status-hint { font-size: 12px; color: #666; margin-bottom: 10px; }
   </style>
 </head>
 <body>
-  <h2>💎 代課調度中心</h2>
+  <div class="header-bar">
+    <h2>💎 Sherry 調度中心</h2>
+    <p class="status-hint">步驟：1.勾選左側課程 -> 2.點擊下方老師名字 (自動產生邀約連結)</p>
+  </div>
+  
   <div id="main">讀取中...</div>
 
   <script>
-    const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec"; 
+    const APP_URL = "妳的GAS網址"; 
     let teachers = []; let courses = [];
 
     window.onload = () => {
@@ -43,39 +49,43 @@
         else if (c['課程'].includes('空環')) type = '空環';
         else if (c['課程'].includes('舞綢')) type = '舞綢';
 
+        // 依專長與梯次排序老師
         const sortedT = [...teachers].sort((a,b) => {
           const am = a['專長'].includes(type) || a['專長'].includes('全能');
           const bm = b['專長'].includes(type) || b['專長'].includes('全能');
           return bm - am;
         });
 
-        const msg = encodeURIComponent(`【Sherry 代課徵求】\n日期：${c['日期']}\n課程：${c['課程']}\n時間：${c['時間']}\n請問您有空代課嗎？`);
-
         return `
           <div class="card">
-            <strong>${c['日期']} ${c['時間']}</strong><br>${c['課程']} (${c['指導者']})
+            <input type="checkbox" class="course-chk chk-box" value="${c.rowId}">
+            <div class="course-info">
+              <strong>${new Date(c['日期']).toLocaleDateString()} ${c['時間']}</strong><br>
+              ${c['課程']} (原師：${c['指導者']})
+            </div>
             <div class="grid">${sortedT.map(t => {
               const isMatch = t['專長'].includes(type) || t['專長'].includes('全能');
-              return `<a href="https://line.me/R/msg/text/?${msg}" target="_blank" class="btn ${isMatch ? t['梯次'] : 'other-skill'}" 
-                      onclick="update(${c.rowId},'詢問中','','${t['指導者']}')">${isMatch ? '' : '(跨)'}${t['指導者']}</a>`;
+              return `<button class="btn ${isMatch ? t['梯次'] : 'other-skill'}" 
+                      onclick="generateLink('${t['指導者']}')">${isMatch ? '' : '(跨)'}${t['指導者']}</button>`;
             }).join('')}</div>
-            <div class="op-bar">
-              <button class="op-btn" style="background:#ffebee;color:#f44336" onclick="update(${c.rowId},'已婉拒')">婉拒</button>
-              <button class="op-btn" style="background:#e8f5e9;color:#2e7d32" onclick="update(${c.rowId},'已成交',true)">成交領取</button>
-            </div>
           </div>`;
       }).join('');
     }
 
-    function update(rowId, status, isSuccess, lastT) {
-      let url = `${APP_URL}?action=updateStatus&rowId=${rowId}&status=${status}`;
-      if(lastT) url += `&lastTeacher=${lastT}`;
-      if(isSuccess) {
-        const name = prompt("是哪位老師代課？");
-        if(!name) return;
-        url += `&subTeacher=${name}`;
-      }
-      fetch(url).then(() => { if(isSuccess || status==='已婉拒') location.reload(); });
+    function generateLink(tName) {
+      const selectedIds = Array.from(document.querySelectorAll('.course-chk:checked')).map(el => el.value);
+      if (selectedIds.length === 0) return alert("請先勾選想要請這位老師代的課程！");
+      
+      // 產出 sub.html 的網址
+      const subUrl = window.location.href.replace('admin.html', 'sub.html');
+      const finalUrl = `${subUrl}?name=${encodeURIComponent(tName)}&ids=${selectedIds.join(',')}`;
+      
+      const msg = `老師您好，想請問這幾堂課您方便代課嗎？\n點擊連結查看並回覆：\n${finalUrl}`;
+      
+      // 複製到剪貼簿
+      navigator.clipboard.writeText(msg).then(() => {
+        alert(`已勾選 ${selectedIds.length} 堂課！\n已為 ${tName} 老師產生專屬連結並複製好囉，直接去 LINE 貼上即可！`);
+      });
     }
   </script>
 </body>
