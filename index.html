@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sherry Aerial 請假系統</title>
   <style>
-    :root { --primary: #34495e; --bg: #f8fafb; }
-    body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 15px; color: #444; }
+    :root { --primary: #34495e; --bg: #f8fafb; --accent: #e67e22; }
+    body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 15px; color: #444; line-height: 1.5; }
     .card { background: white; padding: 22px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
     h2 { color: var(--primary); font-size: 1.25rem; margin-top: 0; display: flex; align-items: center; gap: 10px; }
     h2::before { content: ""; width: 5px; height: 20px; background: var(--primary); border-radius: 10px; }
@@ -18,11 +18,14 @@
     .date-pill span { display: inline-block; padding: 10px 16px; background: #fff; border: 1.5px solid #eee; border-radius: 50px; font-size: 14px; transition: 0.2s; font-weight: 500; color: #444; }
     .date-pill input:checked + span { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 4px 12px rgba(52, 73, 94, 0.2); }
     .board-item { border-bottom: 1px solid #f0f0f0; padding: 18px 0; }
+    .board-item:last-child { border: none; }
     .board-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+    .board-time { font-size: 1.05rem; font-weight: 700; color: #2c3e50; }
     .tag { font-size: 0.75rem; padding: 5px 12px; border-radius: 50px; font-weight: bold; }
-    .tag-wait { background: #fff3e0; color: #e67e22; }
-    .tag-done { background: #e8f5e9; color: #2e7d32; }
+    .tag-wait { background: #fff3e0; color: #e67e22; border: 1px solid #ffe0b2; }
+    .tag-done { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
     .submit-btn { width: 100%; background: var(--primary); color: white; border: none; padding: 16px; border-radius: 15px; font-size: 16px; font-weight: bold; margin-top: 25px; cursor: pointer; }
+    .loading-text { text-align: center; color: #bdc3c7; padding: 20px; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -30,7 +33,6 @@
     <h2>👤 身份驗證</h2>
     <select id="teacherSelect"><option value="">正在載入老師名單...</option></select>
   </div>
-
   <div id="mainUI" style="display:none;">
     <div class="card">
       <h2>📝 我要請假</h2>
@@ -63,8 +65,9 @@
 
     function loadData() {
       const name = document.getElementById('teacherSelect').value;
-      if (!name) return;
+      if (!name) { document.getElementById('mainUI').style.display = 'none'; return; }
       document.getElementById('mainUI').style.display = 'block';
+      document.getElementById('boardArea').innerHTML = '<div class="loading-text">同步進度中...</div>';
       Promise.all([
         fetch(`${APP_URL}?action=getCourseList`).then(r => r.json()),
         fetch(`${APP_URL}?action=getBoard`).then(r => r.json())
@@ -84,7 +87,6 @@
     }
 
     function renderDates() {
-      // 日期由舊到新排序 (3/2 在 3/17 前面)
       const dates = [...new Set(myRawCourses.map(c => c['日期']))].sort((a, b) => new Date(a) - new Date(b));
       document.getElementById('dateGrid').innerHTML = dates.map(d => `
         <label class="date-pill"><input type="checkbox" class="date-chk" value="${d}" onchange="renderCourses()"><span>${formatDateWithDay(d)}</span></label>
@@ -94,10 +96,11 @@
     function renderCourses() {
       const selected = Array.from(document.querySelectorAll('.date-chk:checked')).map(el => el.value);
       const container = document.getElementById('courseChoice');
+      const area = document.getElementById('courseListArea');
       if (!selected.length) { container.style.display = 'none'; return; }
       container.style.display = 'block';
       const filtered = myRawCourses.filter(c => selected.includes(c['日期']));
-      document.getElementById('courseListArea').innerHTML = filtered.map(c => `
+      area.innerHTML = filtered.map(c => `
         <div style="padding:15px; border-bottom:1px solid #f5f5f5; display:flex; align-items:center; gap:12px;">
           <input type="checkbox" class="chk-item" style="width:20px; height:20px;" data-raw='${JSON.stringify(c)}'> 
           <div><div style="font-weight:600; color:#2c3e50;">${formatDateWithDay(c['日期'])}</div><div style="font-size:14px; color:#666;">${c['時間']} - ${c['課程']}</div></div>
@@ -106,22 +109,28 @@
 
     function renderBoard(data, name) {
       const area = document.getElementById('boardArea');
-      // 精準排序：將日期與時間合併後轉換為數字進行比對
-      const myLogs = data.filter(c => String(c['指導者']).trim() === name)
-                         .sort((a, b) => {
-                           // 處理 1899 這種異常時間格式，只提取 HH:mm
-                           let timeA = a['時間'].includes('T') ? a['時間'].split('T')[1].substring(0,5) : a['時間'];
-                           let timeB = b['時間'].includes('T') ? b['時間'].split('T')[1].substring(0,5) : b['時間'];
-                           let valA = new Date(a['日期'] + ' ' + timeA).getTime();
-                           let valB = new Date(b['日期'] + ' ' + timeB).getTime();
-                           return valB - valA; // 最新日期在最上面
-                         });
+      const myLogs = data.filter(c => String(c['指導者']).trim() === name);
       
-      if (!myLogs.length) { area.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">目前暫無您的請假紀錄。</div>'; return; }
+      myLogs.sort((a, b) => {
+        const pA = a['日期'].split('/');
+        const pB = b['日期'].split('/');
+        const tA = a['時間'].includes('T') ? a['時間'].split('T')[1].substring(0,5) : a['時間'];
+        const tB = b['時間'].includes('T') ? b['時間'].split('T')[1].substring(0,5) : b['時間'];
+        
+        const valA = new Date(pA[0], pA[1]-1, pA[2], tA.split(':')[0], tA.split(':')[1]).getTime();
+        const valB = new Date(pB[0], pB[1]-1, pB[2], tB.split(':')[0], tB.split(':')[1]).getTime();
+        
+        return valA - valB; // 【關鍵修正】改為由舊到新排序：日期早的在上面
+      });
+      
+      if (!myLogs.length) {
+        area.innerHTML = '<div class="loading-text">目前暫無您的請假紀錄。</div>';
+        return;
+      }
       area.innerHTML = myLogs.map(l => `
         <div class="board-item">
           <div class="board-header">
-            <strong style="font-size:1.05rem;">${formatDateWithDay(l['日期'])} ${l['時間']}</strong>
+            <span class="board-time">${formatDateWithDay(l['日期'])} ${l['時間']}</span>
             <span class="tag ${l['代課老師'] ? 'tag-done' : 'tag-wait'}">${l['代課老師'] ? '已由 ' + l['代課老師'] + ' 領取' : '⏳ 確認中'}</span>
           </div>
           <div style="font-size:14px; color:#7f8c8d;">課程：${l['課程']}</div>
@@ -131,8 +140,9 @@
     function submitLeave() {
       const chks = document.querySelectorAll('.chk-item:checked');
       if (!chks.length || !confirm("確定要送出請假登記嗎？")) return;
+      const teacherName = document.getElementById('teacherSelect').value;
       const items = Array.from(chks).map(el => JSON.parse(el.getAttribute('data-raw')));
-      fetch(`${APP_URL}?instructor=${encodeURIComponent(document.getElementById('teacherSelect').value)}&items=${encodeURIComponent(JSON.stringify(items))}`)
+      fetch(`${APP_URL}?instructor=${encodeURIComponent(teacherName)}&items=${encodeURIComponent(JSON.stringify(items))}`)
         .then(() => { alert("登記成功！"); location.reload(); });
     }
   </script>
