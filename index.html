@@ -11,67 +11,40 @@
     h2::before { content: ""; width: 4px; height: 18px; background: var(--primary); border-radius: 10px; }
     
     label { font-size: 14px; color: #7f8c8d; margin-bottom: 10px; display: block; font-weight: 500; }
-    
-    /* 質感下拉選單 */
     select { width: 100%; padding: 14px; margin-bottom: 20px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; appearance: none; }
     
-    /* 膠囊日期選擇區 - 優化：自動填滿並靠中對齊消滅空洞感 */
-    .date-container { 
-      display: flex; 
-      flex-wrap: wrap; 
-      gap: 8px; 
-      margin-bottom: 20px;
-      padding: 5px 0;
-      justify-content: flex-start; /* 讓它自然排列，靠左但緊湊 */
-    }
+    /* 膠囊日期選擇區 */
+    .date-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; padding: 5px 0; }
     .date-pill { position: relative; }
     .date-pill input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; z-index: 1; }
-    .date-pill span { 
-      display: inline-block; 
-      padding: 10px 14px; /* 稍微縮小內距，讓一行更容易塞下三個 */
-      background: #fff; 
-      border: 1.5px solid #eee; 
-      border-radius: 50px; 
-      font-size: 14px; 
-      color: #555; 
-      transition: all 0.2s ease; 
-      text-align: center;
-      min-width: 75px; /* 設定基礎寬度確保整齊 */
-      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-    }
-    .date-pill input:checked + span { 
-      background: var(--primary); 
-      color: #fff; 
-      border-color: var(--primary); 
-      transform: translateY(-2px); 
-      box-shadow: 0 4px 10px rgba(52, 73, 94, 0.2); 
-    }
+    .date-pill span { display: inline-block; padding: 10px 14px; background: #fff; border: 1.5px solid #eee; border-radius: 50px; font-size: 14px; color: #555; transition: 0.2s; text-align: center; min-width: 75px; }
+    .date-pill input:checked + span { background: var(--primary); color: #fff; border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 4px 10px rgba(52, 73, 94, 0.2); }
 
     /* 課程列表區 */
     .course-list { background: #fcfcfc; border-radius: 15px; padding: 5px 15px; border: 1px dashed #eee; }
     .course-item { display: flex; align-items: center; padding: 16px 0; border-bottom: 1px solid #f1f1f1; }
-    .course-item:last-child { border-bottom: none; }
     .course-item input { width: 22px; height: 22px; margin-right: 15px; accent-color: var(--primary); }
     .course-item .info { flex: 1; }
     .course-item .info strong { font-size: 15px; display: block; color: #333; }
-    .course-item .info span { font-size: 13px; color: #888; }
     .time-badge { background: #ebf5fb; color: var(--secondary); padding: 2px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; margin-left: 5px; }
 
-    button.submit-btn { width: 100%; padding: 16px; border-radius: 12px; border: none; font-size: 17px; font-weight: 600; cursor: pointer; background: var(--primary); color: white; margin-top: 15px; box-shadow: 0 4px 15px rgba(52, 73, 94, 0.2); transition: 0.3s; }
-    button.submit-btn:disabled { background: #ccc; box-shadow: none; }
+    button.submit-btn { width: 100%; padding: 16px; border-radius: 12px; border: none; font-size: 17px; font-weight: 600; cursor: pointer; background: var(--primary); color: white; margin-top: 15px; }
+    button.submit-btn:disabled { background: #ccc; }
 
-    /* 看板 */
-    .board-item { display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #f9f9f9; align-items: center; }
-    .status-badge { padding: 6px 12px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+    /* --- 分組看板專用樣式 --- */
+    .teacher-group { margin-bottom: 25px; border-radius: 15px; overflow: hidden; border: 1px solid #eee; background: #fff; }
+    .teacher-header { background: #f1f4f7; padding: 10px 15px; font-weight: bold; color: var(--primary); font-size: 14px; border-bottom: 1px solid #eee; }
+    .board-item { display: flex; justify-content: space-between; padding: 12px 15px; border-bottom: 1px solid #f9f9f9; align-items: center; }
+    .board-item:last-child { border-bottom: none; }
+    .status-badge { padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; }
   </style>
 </head>
 <body>
 
   <div class="card">
     <h2>請假登記</h2>
-    
     <label>1. 您是哪位老師？</label>
-    <select id="teacherSelect"><option value="">讀取名單中...</option></select>
+    <select id="teacherSelect"><option value="">讀取中...</option></select>
     
     <label>2. 選擇日期 (可複選)</label>
     <div id="dateGrid" class="date-container">請先選擇名字...</div>
@@ -83,7 +56,7 @@
   </div>
 
   <div class="card">
-    <h2>進度看板</h2>
+    <h2>代課進度看板</h2>
     <div id="board">讀取中...</div>
   </div>
 
@@ -92,6 +65,25 @@
     let allCourses = []; 
     const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
 
+    // 萬能日期解析 (修正 NaN 亂碼問題)
+    function safeDate(d) {
+      if (!d) return null;
+      let date = new Date(d);
+      if (isNaN(date.getTime())) {
+          // 處理 Excel 奇怪的日期字串
+          let s = String(d).split('T')[0].replace(/-/g, '/');
+          date = new Date(s);
+      }
+      return date;
+    }
+
+    function formatTime(timeStr) {
+      if (!timeStr) return "";
+      let dateObj = safeDate(timeStr);
+      if (!dateObj) return timeStr;
+      return dateObj.toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' });
+    }
+
     window.onload = () => {
       fetch(`${APP_URL}?action=getTeachers`).then(r => r.json()).then(data => {
         const select = document.getElementById('teacherSelect');
@@ -99,39 +91,30 @@
           data.map(t => `<option value="${t['指導者']}">${t['指導者']}</option>`).join('');
         select.onchange = onTeacherChange;
       });
-      fetch(`${APP_URL}?action=getCourse`).then(r => r.json()).then(data => { allCourses = data; });
-      renderBoard();
+      fetch(`${APP_URL}?action=getCourse`).then(r => r.json()).then(data => { allCourses = data; renderBoard(); });
     };
-
-    function formatTime(timeStr) {
-      if (!timeStr) return "";
-      let dateObj = new Date(timeStr);
-      return dateObj.toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' });
-    }
 
     function onTeacherChange() {
       const name = document.getElementById('teacherSelect').value;
       const dateGrid = document.getElementById('dateGrid');
-      const listDiv = document.getElementById('courseList');
       dateGrid.innerHTML = "";
-      listDiv.innerHTML = "等待選擇日期...";
+      document.getElementById('courseList').innerHTML = "等待選擇日期...";
       if (!name) return dateGrid.innerHTML = "請先選擇名字...";
 
       const myCourses = allCourses.filter(c => c['指導者'] === name && !c['代課老師']);
       const sortedDates = [...new Set(myCourses.map(c => {
-        let d = new Date(c['日期']);
-        return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
-      }))].sort((a, b) => new Date(a) - new Date(b));
+        let d = safeDate(c['日期']);
+        return d ? `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}` : null;
+      }).filter(x => x))].sort((a, b) => new Date(a) - new Date(b));
 
       if (sortedDates.length === 0) return dateGrid.innerHTML = "✨ 目前無待處理課程。";
 
       sortedDates.forEach(dateStr => {
         const d = new Date(dateStr);
-        const displayDate = `${d.getMonth()+1}/${d.getDate()}`;
         dateGrid.innerHTML += `
           <label class="date-pill">
             <input type="checkbox" class="date-chk" value="${dateStr}" onchange="filterCourses()">
-            <span>${displayDate} (${weekDays[d.getDay()]})</span>
+            <span>${d.getMonth()+1}/${d.getDate()} (${weekDays[d.getDay()]})</span>
           </label>`;
       });
     }
@@ -143,46 +126,63 @@
       if (selectedDates.length === 0) return listDiv.innerHTML = "請選取日期";
 
       const filtered = allCourses.filter(c => {
-        let d = new Date(c['日期']);
-        let cDateStr = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+        let d = safeDate(c['日期']);
+        let cDateStr = d ? `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}` : "";
         return c['指導者'] === name && selectedDates.includes(cDateStr) && !c['代課老師'];
-      }).sort((a,b) => new Date(a['日期']) - new Date(b['日期']));
+      }).sort((a,b) => safeDate(a['日期']) - safeDate(b['日期']));
 
       listDiv.innerHTML = filtered.map(c => `
         <div class="course-item">
           <input type="checkbox" class="chk" value='${JSON.stringify(c)}' checked>
           <div class="info">
             <strong>${c['課程']}</strong>
-            <span>${new Date(c['日期']).toLocaleDateString('zh-TW')} (${weekDays[new Date(c['日期']).getDay()]}) <span class="time-badge">${formatTime(c['時間'])}</span></span>
+            <span style="font-size:12px; color:#888;">${safeDate(c['日期']).toLocaleDateString()} <span class="time-badge">${formatTime(c['時間'])}</span></span>
           </div>
         </div>`).join('');
     }
 
     function renderBoard() {
-      fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r => r.json()).then(data => {
-        const items = data.filter(d => d['指導者'] !== "指導者").slice(-10).reverse();
-        document.getElementById('board').innerHTML = items.map(l => {
-          const d = new Date(l['日期']);
-          const isDone = !!l['代課老師'];
-          return `
-          <div class="board-item">
-            <div>
-              <strong style="font-size:14px;">${d.getMonth()+1}/${d.getDate()} (${weekDays[d.getDay()]}) ${l['課程']}</strong><br>
-              <small style="color:#999;">${formatTime(l['時間'])} | ${l['指導者']}</small>
-            </div>
-            <span class="status-badge" style="background:${isDone?'#e8f5e9':'#f5f5f5'}; color:${isDone?'#2e7d32':'#888'};">
-              ${isDone ? '已代課' : (l['狀態'] === '詢問中' ? '洽詢中' : '待代課')}
-            </span>
-          </div>`;
-        }).join('');
-      });
+      const board = document.getElementById('board');
+      const items = allCourses.filter(d => d['指導者'] !== "指導者" && d['指導者']).slice(-30).reverse();
+      
+      if (items.length === 0) return board.innerHTML = "目前暫無記錄";
+
+      // 按老師名稱分組
+      const groups = items.reduce((acc, obj) => {
+        const key = obj['指導者'];
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(obj);
+        return acc;
+      }, {});
+
+      board.innerHTML = Object.keys(groups).map(teacher => `
+        <div class="teacher-group">
+          <div class="teacher-header">👤 ${teacher} 老師的請假</div>
+          ${groups[teacher].map(l => {
+            const d = safeDate(l['日期']);
+            const isDone = !!l['代課老師'];
+            const dateDisplay = d ? `${d.getMonth()+1}/${d.getDate()} (${weekDays[d.getDay()]})` : "格式錯誤";
+            return `
+              <div class="board-item">
+                <div>
+                  <strong style="font-size:13px;">${dateDisplay} ${l['課程']}</strong><br>
+                  <small style="color:#999;">${formatTime(l['時間'])}</small>
+                </div>
+                <span class="status-badge" style="background:${isDone?'#e8f5e9':'#fff3e0'}; color:${isDone?'#2e7d32':'#ef6c00'};">
+                  ${isDone ? '已結案' : (l['狀態'] === '詢問中' ? '洽詢中' : '徵求中')}
+                </span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `).join('');
     }
 
     function submitLeave() {
       const name = document.getElementById('teacherSelect').value;
       const selected = Array.from(document.querySelectorAll('.chk:checked')).map(el => JSON.parse(el.value));
-      if (!name || selected.length === 0) return alert("請勾選要請假的日期與課程");
-      if (!confirm(`確定提交這 ${selected.length} 堂請假申請？`)) return;
+      if (!name || selected.length === 0) return alert("請勾選課程");
+      if (!confirm(`確定提交 ${selected.length} 堂請假？`)) return;
       const btn = document.getElementById('submitBtn');
       btn.innerText = "提交中..."; btn.disabled = true;
       fetch(`${APP_URL}?instructor=${name}&items=${encodeURIComponent(JSON.stringify(selected))}`)
