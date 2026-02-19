@@ -3,51 +3,55 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sherry Aerial 代課領取系統</title>
+  <title>Sherry Aerial 代課批次領取</title>
   <style>
     :root { --primary: #34495e; --bg: #f8fafb; --success: #27ae60; }
-    body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 15px; color: #444; }
+    body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 15px; color: #444; padding-bottom: 80px; }
     .card { background: white; padding: 22px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
     h2 { color: var(--primary); font-size: 1.2rem; margin-top: 0; display: flex; align-items: center; gap: 8px; }
     h2::before { content: ""; width: 4px; height: 18px; background: var(--primary); border-radius: 10px; }
     
     select { width: 100%; padding: 12px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; margin-bottom: 10px; background: #fff; appearance: none; }
 
-    /* 課程卡片排列優化 */
+    /* 批次領取卡片 */
     .course-card { 
       background: #fff;
       border: 1px solid #f0f0f0; 
-      padding: 20px; 
+      padding: 18px; 
       border-radius: 16px; 
       margin-bottom: 15px; 
       display: flex; 
-      justify-content: space-between; 
       align-items: center;
+      gap: 15px;
       transition: 0.2s;
+      cursor: pointer;
     }
-    .course-info { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-    
-    /* 1. 日期時間：最上方標題感 */
-    .course-time { font-size: 1.1rem; font-weight: 800; color: #2c3e50; }
-    
-    /* 2. 課程名稱：中間重點 */
-    .course-title { font-size: 15px; color: #34495e; font-weight: 600; }
-    
-    /* 3. 指導者：最下方標籤 */
-    .instructor-tag { font-size: 12px; color: #7f8c8d; background: #f1f2f6; padding: 2px 8px; border-radius: 6px; width: fit-content; }
+    /* 當勾選框選中時，卡片變色 */
+    .course-card.selected { border-color: var(--success); background: #f0fff4; }
 
-    .claim-btn { 
-      background: var(--success); 
-      color: white; 
-      border: none; 
-      padding: 12px 24px; 
-      border-radius: 12px; 
-      font-weight: bold; 
-      cursor: pointer; 
-      font-size: 15px;
-      margin-left: 10px;
+    .course-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .course-time { font-size: 1.1rem; font-weight: 800; color: #2c3e50; }
+    .course-title { font-size: 14px; color: #34495e; font-weight: 600; }
+    .instructor-tag { font-size: 12px; color: #7f8c8d; background: #f1f2f6; padding: 2px 8px; border-radius: 6px; width: fit-content; margin-top: 4px; }
+
+    /* 勾選框樣式放大 */
+    .batch-chk { width: 22px; height: 22px; cursor: pointer; accent-color: var(--success); }
+
+    /* 底部固定按鈕欄 */
+    .footer-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: white; padding: 15px 20px;
+      box-shadow: 0 -5px 20px rgba(0,0,0,0.05);
+      display: none; /* 有選擇時才顯示 */
+      z-index: 100;
     }
-    .claim-btn:active { transform: scale(0.95); }
+    .submit-btn { 
+      width: 100%; background: var(--success); color: white; border: none; 
+      padding: 16px; border-radius: 15px; font-size: 16px; font-weight: bold; 
+      cursor: pointer; box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+    }
+    .submit-btn:disabled { background: #bdc3c7; box-shadow: none; }
+
     .empty-msg { text-align: center; padding: 40px; color: #bdc3c7; font-size: 14px; }
   </style>
 </head>
@@ -62,7 +66,11 @@
 
   <div class="card">
     <h2>📢 待領取課表</h2>
-    <div id="listArea"><div class="empty-msg">請先選取您的名字，系統將排除您的請假課程...</div></div>
+    <div id="listArea"><div class="empty-msg">請先選取您的名字...</div></div>
+  </div>
+
+  <div id="footerBar" class="footer-bar">
+    <button id="batchBtn" class="submit-btn" onclick="submitBatchClaim()">確認領取 (0)</button>
   </div>
 
   <script>
@@ -78,19 +86,18 @@
     function loadAvailableCourses() {
       const myName = document.getElementById('meSelect').value;
       const area = document.getElementById('listArea');
+      document.getElementById('footerBar').style.display = 'none';
       if (!myName) return;
 
-      area.innerHTML = '<div class="empty-msg">過濾中...</div>';
+      area.innerHTML = '<div class="empty-msg">更新中...</div>';
 
       fetch(`${APP_URL}?action=getBoard`).then(r => r.json()).then(data => {
-        // 過濾邏輯：1.確認中 2.「排除」目前選取的本人名字 3.尚未被領取
         const available = data.filter(c => 
           c['狀態'] === '確認中' && 
           String(c['指導者']).trim() !== myName && 
           (!c['代課老師'] || c['代課老師'] === "")
         );
 
-        // 由早到晚排序
         available.sort((a, b) => {
           const valA = new Date(a['日期'] + ' ' + (a['時間'].includes('T') ? a['時間'].split('T')[1].substring(0,5) : a['時間'])).getTime();
           const valB = new Date(b['日期'] + ' ' + (b['時間'].includes('T') ? b['時間'].split('T')[1].substring(0,5) : b['時間'])).getTime();
@@ -101,6 +108,27 @@
       });
     }
 
+    function renderList(list) {
+      const area = document.getElementById('listArea');
+      if (list.length === 0) {
+        area.innerHTML = '<div class="empty-msg">🌵 目前沒有可領取的代課課程</div>';
+        return;
+      }
+
+      area.innerHTML = list.map((c, index) => `
+        <div class="course-card" id="card-${index}" onclick="toggleSelect(${index})">
+          <input type="checkbox" class="batch-chk" id="chk-${index}" 
+                 data-date="${c['日期']}" data-time="${c['時間']}" data-instructor="${c['指導者']}"
+                 onclick="event.stopPropagation(); updateBtn();">
+          <div class="course-info">
+            <div class="course-time">${formatDateWithDay(c['日期'])} ${c['時間']}</div>
+            <div class="course-title">課程：${c['課程']}</div>
+            <div class="instructor-tag">原指導者：${c['指導者']}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
     function formatDateWithDay(d) {
       if (!d) return "";
       let dateObj = new Date(d);
@@ -109,39 +137,62 @@
       return `${dateObj.getMonth() + 1}/${dateObj.getDate()} (${weekdays[dateObj.getDay()]})`;
     }
 
-    function renderList(list) {
-      const area = document.getElementById('listArea');
-      if (list.length === 0) {
-        area.innerHTML = '<div class="empty-msg">🌵 目前沒有可領取的代課課程<br>(已自動隱藏您的請假項)</div>';
-        return;
-      }
-
-      area.innerHTML = list.map(c => `
-        <div class="course-card">
-          <div class="course-info">
-            <div class="course-time">${formatDateWithDay(c['日期'])} ${c['時間']}</div>
-            <div class="course-title">課程：${c['課程']}</div>
-            <div class="instructor-tag">原指導者：${c['指導者']}</div>
-          </div>
-          <button class="claim-btn" onclick="claimCourse('${c['日期']}', '${c['時間']}', '${c['指導者']}')">領取</button>
-        </div>
-      `).join('');
+    // 點擊卡片也能選中
+    function toggleSelect(index) {
+      const chk = document.getElementById(`chk-${index}`);
+      chk.checked = !chk.checked;
+      updateBtn();
     }
 
-    function claimCourse(date, time, instructor) {
-      const myName = document.getElementById('meSelect').value;
-      if (!confirm(`確定要領取代課嗎？`)) return;
-
-      const url = `${APP_URL}?action=subClaim&date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}&instructor=${encodeURIComponent(instructor)}&subTeacher=${encodeURIComponent(myName)}`;
+    // 更新底部按鈕數字與顯示狀態
+    function updateBtn() {
+      const chks = document.querySelectorAll('.batch-chk:checked');
+      const footer = document.getElementById('footerBar');
+      const btn = document.getElementById('batchBtn');
       
-      fetch(url).then(r => r.json()).then(res => {
-        if (res.status === "success") {
-          alert("領取成功！");
-          loadAvailableCourses();
-        } else {
-          alert("失敗：" + res.message);
-        }
+      // 更新卡片選取視覺效果
+      document.querySelectorAll('.course-card').forEach((card, idx) => {
+        if (document.getElementById(`chk-${idx}`).checked) card.classList.add('selected');
+        else card.classList.remove('selected');
       });
+
+      if (chks.length > 0) {
+        footer.style.display = 'block';
+        btn.innerText = `確認領取 (${chks.length}) 堂課`;
+      } else {
+        footer.style.display = 'none';
+      }
+    }
+
+    async function submitBatchClaim() {
+      const myName = document.getElementById('meSelect').value;
+      const chks = Array.from(document.querySelectorAll('.batch-chk:checked'));
+      if (!confirm(`確定要領取這 ${chks.length} 堂課嗎？`)) return;
+
+      const btn = document.getElementById('batchBtn');
+      btn.disabled = true;
+      btn.innerText = "處理中...";
+
+      let successCount = 0;
+
+      // 逐一發送請求
+      for (let chk of chks) {
+        const date = chk.dataset.date;
+        const time = chk.dataset.time;
+        const instructor = chk.dataset.instructor;
+        const url = `${APP_URL}?action=subClaim&date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}&instructor=${encodeURIComponent(instructor)}&subTeacher=${encodeURIComponent(myName)}`;
+        
+        try {
+          const r = await fetch(url);
+          const res = await r.json();
+          if (res.status === "success") successCount++;
+        } catch (e) {
+          console.error("領取失敗", e);
+        }
+      }
+
+      alert(`領取完成！成功領取 ${successCount} 堂課。`);
+      loadAvailableCourses();
     }
   </script>
 </body>
