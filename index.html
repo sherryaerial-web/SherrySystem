@@ -7,16 +7,24 @@
     body { font-family: -apple-system, sans-serif; background: #f4f7f6; padding: 15px; color: #444; margin: 0; line-height: 1.6; }
     .card { background: #fff; padding: 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 20px; }
     h2 { color: #2c3e50; margin-top: 0; font-size: 1.1rem; border-left: 4px solid #34495e; padding-left: 12px; margin-bottom: 20px; }
-    label { font-size: 13px; color: #7f8c8d; margin-bottom: 5px; display: block; }
-    select, button { width: 100%; padding: 12px; margin: 8px 0 15px 0; border-radius: 10px; border: 1px solid #dfe6e9; font-size: 16px; box-sizing: border-box; -webkit-appearance: none; }
-    select { background: #fff url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E") no-repeat right 12px center; background-size: 12px; }
-    button.submit-btn { background: #34495e; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.3s; }
-    button.submit-btn:disabled { background: #bdc3c7; }
+    label { font-size: 13px; color: #7f8c8d; margin-bottom: 8px; display: block; font-weight: bold; }
+    
+    /* 下拉選單樣式 */
+    select, button { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 10px; border: 1px solid #dfe6e9; font-size: 16px; box-sizing: border-box; }
+    
+    /* 日期複選區塊樣式 */
+    .date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-height: 200px; overflow-y: auto; padding: 10px; background: #f9f9f9; border-radius: 10px; border: 1px solid #eee; margin-bottom: 15px; }
+    .date-item { display: flex; align-items: center; font-size: 14px; background: #fff; padding: 8px; border-radius: 6px; border: 1px solid #eee; }
+    .date-item input { margin-right: 8px; }
+
+    /* 課程列表樣式 */
     .course-item { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #f1f2f6; }
     .course-item input { margin-right: 15px; transform: scale(1.3); accent-color: #34495e; }
-    .time-label { color: #2980b9; font-weight: 600; margin-left: 5px; }
+    .time-label { color: #2980b9; font-weight: 600; margin-left: 8px; }
+    
+    button.submit-btn { background: #34495e; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    button.submit-btn:disabled { background: #bdc3c7; }
     .status-tag { padding: 5px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; }
-    #courseList { min-height: 40px; }
   </style>
 </head>
 <body>
@@ -24,14 +32,14 @@
   <div class="card">
     <h2>👋 老師請假登記</h2>
     
-    <label>Step 1. 選擇您的名字</label>
+    <label>第一步：選擇您的名字</label>
     <select id="teacherSelect"><option value="">載入中...</option></select>
     
-    <label>Step 2. 選擇日期</label>
-    <select id="dateSelect" disabled><option value="">請先選擇名字</option></select>
+    <label id="dateLabel">第二步：勾選請假日期 (可複選)</label>
+    <div id="dateGrid" class="date-grid">請先選擇名字...</div>
     
-    <label>Step 3. 勾選課程</label>
-    <div id="courseList">請完成上方選擇...</div>
+    <label>第三步：確認請假課程</label>
+    <div id="courseList">請先勾選日期...</div>
     
     <button class="submit-btn" id="submitBtn" onclick="submitLeave()">提交請假申請</button>
   </div>
@@ -44,6 +52,7 @@
   <script>
     const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec"; 
     let allCourses = []; 
+    const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
 
     window.onload = () => {
       fetch(`${APP_URL}?action=getTeachers`).then(r => r.json()).then(data => {
@@ -60,71 +69,76 @@
       renderBoard();
     };
 
-    // 格式化時間 (修正 PM 問題)
+    // 格式化時間 (處理 PM 2:30 顯示為 14:30 的問題)
     function formatTime(timeStr) {
       if (!timeStr) return "";
       if (typeof timeStr === 'string' && timeStr.includes('T')) {
-        let t = timeStr.split('T')[1].substring(0, 5);
-        // 如果妳的 Excel 出現 12 小時制，這裡可以進一步處理，
-        // 但通常 ISO 格式 (T之後) 是 24 小時制。
-        return t; 
+        let dateObj = new Date(timeStr);
+        // 強制轉換為在地 24 小時制格式
+        return dateObj.toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' });
       }
       return timeStr;
     }
 
     function onTeacherChange() {
       const name = document.getElementById('teacherSelect').value;
-      const dateSelect = document.getElementById('dateSelect');
+      const dateGrid = document.getElementById('dateGrid');
       const listDiv = document.getElementById('courseList');
       
-      dateSelect.innerHTML = '<option value="">選擇日期</option>';
-      listDiv.innerHTML = "請選擇日期...";
+      dateGrid.innerHTML = "";
+      listDiv.innerHTML = "請先勾選日期...";
       
-      if (!name) {
-        dateSelect.disabled = true;
+      if (!name) return dateGrid.innerHTML = "請先選擇名字...";
+
+      // 1. 篩選老師的課程
+      const myCourses = allCourses.filter(c => c['指導者'] === name && !c['代課老師']);
+      
+      // 2. 取得不重複日期並排序 (由舊到新)
+      const sortedDates = [...new Set(myCourses.map(c => {
+        let d = new Date(c['日期']);
+        return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+      }))].sort((a, b) => new Date(a) - new Date(b));
+
+      if (sortedDates.length === 0) {
+        dateGrid.innerHTML = "✨ 目前無待處理課程。";
         return;
       }
 
-      // 找出該老師有哪些日期有課
-      const myDates = [...new Set(allCourses
-        .filter(c => c['指導者'] === name && !c['代課老師'])
-        .map(c => new Date(c['日期']).toLocaleDateString('zh-TW'))
-      )].sort();
-
-      if (myDates.length === 0) {
-        dateSelect.innerHTML = '<option value="">目前無課程</option>';
-        dateSelect.disabled = true;
-        listDiv.innerHTML = "✨ 您目前沒有待處理的課程。";
-      } else {
-        dateSelect.disabled = false;
-        myDates.forEach(d => {
-          dateSelect.innerHTML += `<option value="${d}">${d}</option>`;
-        });
-        dateSelect.onchange = filterCourses;
-      }
+      // 3. 渲染日期複選框 (加入星期顯示)
+      sortedDates.forEach(dateStr => {
+        const d = new Date(dateStr);
+        const dayLabel = weekDays[d.getDay()];
+        dateGrid.innerHTML += `
+          <label class="date-item">
+            <input type="checkbox" class="date-chk" value="${dateStr}" onchange="filterCourses()">
+            ${dateStr} (${dayLabel})
+          </label>`;
+      });
     }
 
     function filterCourses() {
       const name = document.getElementById('teacherSelect').value;
-      const date = document.getElementById('dateSelect').value;
+      const selectedDates = Array.from(document.querySelectorAll('.date-chk:checked')).map(el => el.value);
       const listDiv = document.getElementById('courseList');
 
-      if (!date) {
-        listDiv.innerHTML = "請選擇日期...";
+      if (selectedDates.length === 0) {
+        listDiv.innerHTML = "請勾選上方日期...";
         return;
       }
 
-      const filtered = allCourses.filter(c => 
-        c['指導者'] === name && 
-        new Date(c['日期']).toLocaleDateString('zh-TW') === date &&
-        !c['代課老師']
-      );
+      // 篩選出勾選日期內的課程
+      const filtered = allCourses.filter(c => {
+        let d = new Date(c['日期']);
+        let cDateStr = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+        return c['指導者'] === name && selectedDates.includes(cDateStr) && !c['代課老師'];
+      }).sort((a,b) => new Date(a['日期']) - new Date(b['日期'])); // 課程也按時間排
 
       listDiv.innerHTML = filtered.map(c => `
         <div class="course-item">
-          <input type="checkbox" class="chk" value='${JSON.stringify(c)}'>
+          <input type="checkbox" class="chk" value='${JSON.stringify(c)}' checked>
           <div>
-            <strong>${c['課程']}</strong>
+            <strong>${new Date(c['日期']).toLocaleDateString('zh-TW')} (${weekDays[new Date(c['日期']).getDay()]})</strong><br>
+            <span>${c['課程']}</span>
             <span class="time-label">${formatTime(c['時間'])}</span>
           </div>
         </div>`).join('');
@@ -133,23 +147,26 @@
     function renderBoard() {
       fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r => r.json()).then(data => {
         const items = data.filter(d => d['指導者'] !== "指導者").slice(-15).reverse();
-        document.getElementById('board').innerHTML = items.map(l => `
+        document.getElementById('board').innerHTML = items.map(l => {
+          const d = new Date(l['日期']);
+          return `
           <div style="display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid #eee; align-items:center;">
             <div>
-              <strong>${new Date(l['日期']).toLocaleDateString('zh-TW')} ${l['課程']}</strong><br>
+              <strong>${d.toLocaleDateString('zh-TW')} (${weekDays[d.getDay()]}) ${l['課程']}</strong><br>
               <small>${formatTime(l['時間'])} | ${l['指導者']} 老師</small>
             </div>
             <span class="status-tag" style="background:${l['代課老師']?'#e8f5e9':'#f1f2f6'}; color:${l['代課老師']?'#2e7d32':'#7f8c8d'};">
               ${l['代課老師'] ? '✅ 已結案' : (l['狀態'] === '詢問中' ? '⌛ 洽詢中' : '❓ 徵求中')}
             </span>
-          </div>`).join('');
+          </div>`;
+        }).join('');
       });
     }
 
     function submitLeave() {
       const name = document.getElementById('teacherSelect').value;
       const selected = Array.from(document.querySelectorAll('.chk:checked')).map(el => JSON.parse(el.value));
-      if (!name || selected.length === 0) return alert("請勾選課程");
+      if (!name || selected.length === 0) return alert("請勾選要請假的課程");
       if (!confirm(`確定提交這 ${selected.length} 堂請假申請？`)) return;
 
       const btn = document.getElementById('submitBtn');
