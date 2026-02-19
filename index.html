@@ -21,23 +21,18 @@
     <div id="courseList">讀取課程中...</div>
     <button class="submit-btn" onclick="submitLeave()">提交請假申請</button>
   </div>
-
   <div class="card">
     <h2>📅 代課進度看板</h2>
     <div id="board">讀取中...</div>
   </div>
-
   <script>
     const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec"; 
-
     window.onload = () => {
-      // 載入老師名單
       fetch(`${APP_URL}?action=getTeachers`).then(r => r.json()).then(data => {
         const select = document.getElementById('teacherSelect');
         select.innerHTML = '<option value="">請選擇您的名字</option>' + 
           data.map(t => `<option value="${t['指導者']}">${t['指導者']}</option>`).join('');
       });
-      // 載入課程
       fetch(`${APP_URL}?action=getCourse`).then(r => r.json()).then(data => {
         document.getElementById('courseList').innerHTML = data.map(c => `
           <div class="course-item">
@@ -48,7 +43,6 @@
       });
       renderBoard();
     };
-
     function renderBoard() {
       fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r => r.json()).then(data => {
         const items = data.filter(d => d['指導者'] !== "指導者").slice(-15).reverse();
@@ -61,7 +55,6 @@
           </div>`).join('');
       });
     }
-
     function submitLeave() {
       const name = document.getElementById('teacherSelect').value;
       const selected = Array.from(document.querySelectorAll('.chk:checked')).map(el => JSON.parse(el.value));
