@@ -13,14 +13,17 @@
     label { font-size: 14px; color: #7f8c8d; margin-bottom: 10px; display: block; font-weight: 500; }
     select { width: 100%; padding: 14px; margin-bottom: 20px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; appearance: none; }
     
+    /* 膠囊按鈕 */
     .date-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; padding: 5px 0; }
     .date-pill { position: relative; }
     .date-pill input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; z-index: 1; }
     .date-pill span { display: inline-block; padding: 10px 14px; background: #fff; border: 1.5px solid #eee; border-radius: 50px; font-size: 14px; color: #555; transition: 0.2s; text-align: center; min-width: 75px; }
     .date-pill input:checked + span { background: var(--primary); color: #fff; border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 4px 10px rgba(52, 73, 94, 0.2); }
 
+    /* 課程列表 */
     .course-list { background: #fcfcfc; border-radius: 15px; padding: 5px 15px; border: 1px dashed #eee; }
     .course-item { display: flex; align-items: center; padding: 16px 0; border-bottom: 1px solid #f1f1f1; }
+    .course-item:last-child { border-bottom: none; }
     .course-item input { width: 22px; height: 22px; margin-right: 15px; accent-color: var(--primary); }
     .course-item .info { flex: 1; }
     .course-item .info strong { font-size: 15px; display: block; color: #333; }
@@ -29,8 +32,9 @@
     button.submit-btn { width: 100%; padding: 16px; border-radius: 12px; border: none; font-size: 17px; font-weight: 600; cursor: pointer; background: var(--primary); color: white; margin-top: 15px; }
     button.submit-btn:disabled { background: #ccc; }
 
+    /* 看板分組樣式 */
     .teacher-group { margin-bottom: 25px; border-radius: 15px; overflow: hidden; border: 1px solid #eee; background: #fff; }
-    .teacher-header { background: #f1f4f7; padding: 10px 15px; font-weight: bold; color: var(--primary); font-size: 14px; border-bottom: 1px solid #eee; }
+    .teacher-header { background: #f1f4f7; padding: 10px 15px; font-weight: bold; color: var(--primary); font-size: 14px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 6px; }
     .board-item { display: flex; justify-content: space-between; padding: 12px 15px; border-bottom: 1px solid #f9f9f9; align-items: center; }
     .board-item:last-child { border-bottom: none; }
     .status-badge { padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; }
@@ -54,7 +58,7 @@
 
   <div class="card">
     <h2>代課進度看板</h2>
-    <div id="board">目前無請假記錄</div>
+    <div id="board">正在更新看板...</div>
   </div>
 
   <script>
@@ -69,13 +73,13 @@
           let s = String(d).split('T')[0].replace(/-/g, '/');
           date = new Date(s);
       }
-      return date;
+      return isNaN(date.getTime()) ? null : date;
     }
 
     function formatTime(timeStr) {
       if (!timeStr) return "";
       let dateObj = safeDate(timeStr);
-      if (!dateObj) return timeStr;
+      if (!dateObj) return "";
       return dateObj.toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' });
     }
 
@@ -86,7 +90,10 @@
           data.map(t => `<option value="${t['指導者']}">${t['指導者']}</option>`).join('');
         select.onchange = onTeacherChange;
       });
-      fetch(`${APP_URL}?action=getCourse`).then(r => r.json()).then(data => { allCourses = data; renderBoard(); });
+      fetch(`${APP_URL}?action=getCourse`).then(r => r.json()).then(data => { 
+        allCourses = data; 
+        renderBoard(); 
+      });
     };
 
     function onTeacherChange() {
@@ -96,7 +103,8 @@
       document.getElementById('courseList').innerHTML = "等待選擇日期...";
       if (!name) return dateGrid.innerHTML = "請先選擇名字...";
 
-      const myCourses = allCourses.filter(c => c['指導者'] === name && !c['代課老師']);
+      // 這裡也加入防呆，避免選擇日期時出現空的按鈕
+      const myCourses = allCourses.filter(c => c['指導者'] === name && !c['代課老師'] && c['日期']);
       const sortedDates = [...new Set(myCourses.map(c => {
         let d = safeDate(c['日期']);
         return d ? `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}` : null;
@@ -138,15 +146,19 @@
 
     function renderBoard() {
       const board = document.getElementById('board');
-      // 重要修正：只顯示「有代課老師」或「狀態不是空白」的記錄
-      // 這邊判斷條件：只要「狀態」有填寫內容，就代表老師發出了請假請求
-      const items = allCourses.filter(d => 
-        d['指導者'] !== "指導者" && 
-        d['指導者'] && 
-        (d['代課老師'] || (d['狀態'] && d['狀態'].trim() !== ""))
-      ).slice(-50).reverse();
       
-      if (items.length === 0) return board.innerHTML = "目前暫無請假記錄";
+      // 修正：增加明確的資料完整度判斷 c['課程'] && c['日期']
+      const items = allCourses.filter(c => {
+        const hasTeacher = c['指導者'] && c['指導者'] !== "指導者";
+        const hasEssentialInfo = c['課程'] && c['日期']; 
+        const status = (c['狀態'] || "").trim();
+        const sub = (c['代課老師'] || "").trim();
+        
+        // 只有資訊完整，且正在徵求中、詢問中或是已代課才顯示
+        return hasTeacher && hasEssentialInfo && (status === "徵求中" || status === "詢問中" || sub !== "");
+      }).slice(-30).reverse();
+      
+      if (items.length === 0) return board.innerHTML = "<div style='text-align:center; padding:20px; color:#999;'>目前暫無請假記錄</div>";
 
       const groups = items.reduce((acc, obj) => {
         const key = obj['指導者'];
@@ -160,8 +172,8 @@
           <div class="teacher-header">👤 ${teacher} 老師的請假</div>
           ${groups[teacher].map(l => {
             const d = safeDate(l['日期']);
-            const isDone = !!l['代課老師'];
-            const dateDisplay = d ? `${d.getMonth()+1}/${d.getDate()} (${weekDays[d.getDay()]})` : "日期異常";
+            const isDone = !!(l['代課老師'] || "").trim();
+            const dateDisplay = d ? `${d.getMonth()+1}/${d.getDate()} (${weekDays[d.getDay()]})` : "日期格式錯誤";
             return `
               <div class="board-item">
                 <div>
@@ -169,7 +181,7 @@
                   <small style="color:#999;">${formatTime(l['時間'])}</small>
                 </div>
                 <span class="status-badge" style="background:${isDone?'#e8f5e9':'#fff3e0'}; color:${isDone?'#2e7d32':'#ef6c00'};">
-                  ${isDone ? '已代課' : (l['狀態'] === '詢問中' ? '洽詢中' : '徵求中')}
+                  ${isDone ? '已結案' : (l['狀態'] === '詢問中' ? '洽詢中' : '徵求中')}
                 </span>
               </div>
             `;
