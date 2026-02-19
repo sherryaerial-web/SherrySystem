@@ -1,49 +1,60 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html>
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>代課邀約確認</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>代課領取系統</title>
   <style>
-    body { font-family: -apple-system, sans-serif; background: #fdf2f2; padding: 20px; }
-    .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
-    .course-item { border-bottom: 1px solid #eee; padding: 15px 0; display: flex; align-items: center; }
-    .course-item input { transform: scale(1.6); margin-right: 20px; }
-    .btn { width: 100%; padding: 15px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; margin-top: 25px; cursor: pointer; background: #4caf50; color: white; }
-    .decline-btn { background: none; color: #999; text-decoration: underline; font-size: 14px; margin-top: 15px; border: none; width: 100%; }
+    body { font-family: sans-serif; background: #f4f7f6; padding: 15px; }
+    .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .course-item { border: 1px solid #eee; padding: 15px; border-radius: 10px; margin-bottom: 10px; }
+    .ask-info { color: #d35400; font-weight: bold; background: #fff3e0; padding: 5px; border-radius: 5px; display: inline-block; margin: 10px 0; }
+    .btn { width: 100%; background: #27ae60; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h2 id="welcome">老師您好</h2>
-    <p>以下是 Sherry 邀請您代課的時段，請勾選您可以承接的課程：</p>
-    <div id="list">讀取課程中...</div>
-    <button class="btn" onclick="submitClaim()">確認提交勾選</button>
-    <button class="decline-btn" onclick="submitDecline()">暫不方便，全部婉拒</button>
+    <h2>🙋 代課領取清單</h2>
+    <div id="list">載入中...</div>
   </div>
+
   <script>
-    const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec";
-    const params = new URLSearchParams(window.location.search);
-    const tName = params.get('name');
-    const ids = params.get('ids') ? params.get('ids').split(',') : [];
-    document.getElementById('welcome').innerText = `${tName} 老師您好`;
-    fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r => r.json()).then(data => {
-      const filtered = data.filter(d => ids.includes(String(d.rowId)));
-      document.getElementById('list').innerHTML = filtered.map(c => `
-        <div class="course-item">
-          <input type="checkbox" class="claim-chk" value="${c.rowId}">
-          <div><strong>${new Date(c['日期']).toLocaleDateString('zh-TW')} ${c['時間']}</strong><br>${c['課程']}</div>
-        </div>`).join('');
-    });
-    function submitClaim() {
-      const selectedIds = Array.from(document.querySelectorAll('.claim-chk:checked')).map(el => el.value);
-      if (selectedIds.length === 0) return alert("請至少勾選一堂課喔！");
-      Promise.all(selectedIds.map(id => fetch(`${APP_URL}?action=updateStatus&rowId=${id}&status=已成交&subTeacher=${encodeURIComponent(tName)}`)))
-      .then(() => { alert("認領完成！感謝老師！"); window.close(); });
-    }
-    function submitDecline() {
-      if(!confirm("確定婉拒嗎？")) return;
-      Promise.all(ids.map(id => fetch(`${APP_URL}?action=updateStatus&rowId=${id}&status=已婉拒`)))
-      .then(() => { alert("已收到回覆，辛苦了！"); window.close(); });
+    const API = "妳的GAS網址"; // 記得換成妳部署後的網址
+
+    window.onload = () => {
+      fetch(`${API}?action=getCourse&isAdmin=true`)
+        .then(r => r.json())
+        .then(data => {
+          // 只顯示「確認中」且「代課老師(G欄)為空」的資料
+          const list = data.filter(c => c['狀態'] === '確認中' && (!c['代課老師'] || c['代課老師'] === ""));
+          const container = document.getElementById('list');
+          
+          if(list.length === 0) {
+            container.innerHTML = "目前沒有待代課的課程。";
+            return;
+          }
+
+          container.innerHTML = list.map(item => `
+            <div class="course-item">
+              <strong>${item['指導者']} 老師</strong><br>
+              課程：${item['課程']}<br>
+              時間：${item['日期']} (${item['時間']})<br>
+              <div class="ask-info">📢 目前優先詢問：${item['最後詢問對象'] || '等待安排中'}</div>
+              <button class="btn" onclick="take('${item.rowId}', '${item['課程']}')">我已確認代課</button>
+            </div>
+          `).join('');
+        });
+    };
+
+    function take(id, title) {
+      const name = prompt("請輸入您的名字以確認領取：");
+      if(!name) return;
+      fetch(`${API}?action=takeCourse&rowId=${id}&subName=${encodeURIComponent(name)}`)
+        .then(r => r.text())
+        .then(res => {
+          alert(res);
+          location.reload();
+        });
     }
   </script>
 </body>
