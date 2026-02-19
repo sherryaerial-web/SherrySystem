@@ -10,25 +10,18 @@
     .card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
     h2 { color: var(--primary); font-size: 1.2rem; margin-top: 0; display: flex; align-items: center; gap: 8px; }
     h2::before { content: ""; width: 4px; height: 18px; background: var(--primary); border-radius: 10px; }
-    
     label { font-size: 14px; color: #7f8c8d; margin-bottom: 8px; display: block; font-weight: 500; }
     select { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; appearance: none; }
-    
-    /* 日期複選樣式 */
     .date-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
     .date-pill { position: relative; }
     .date-pill input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
     .date-pill span { display: inline-block; padding: 10px 14px; background: #fff; border: 1.5px solid #eee; border-radius: 50px; font-size: 14px; transition: 0.2s; }
     .date-pill input:checked + span { background: var(--primary); color: #fff; border-color: var(--primary); }
-
-    /* 課程卡片樣式 */
     .course-card { background: white; border-radius: 18px; padding: 18px; margin-bottom: 15px; border: 1px solid rgba(0,0,0,0.03); box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
     .course-title { font-size: 1.15rem; font-weight: 800; color: #2c3e50; margin-bottom: 8px; }
     .course-info { font-size: 0.9rem; color: #7f8c8d; line-height: 1.6; margin-bottom: 15px; }
     .teacher-small { font-size: 0.75rem; color: #bdc3c7; background: #f8f9fa; padding: 2px 6px; border-radius: 4px; }
-    
-    .btn-take { width: 100%; background: var(--success); color: white; border: none; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(39, 174, 96, 0.2); }
-    .btn-take:active { transform: scale(0.97); }
+    .btn-take { width: 100%; background: var(--success); color: white; border: none; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -50,6 +43,24 @@
     const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec";
     let allAvailableCourses = [];
 
+    function formatSafeDate(d) {
+      if (!d) return "";
+      let dateObj = new Date(d);
+      if (isNaN(dateObj)) return d;
+      return (dateObj.getMonth() + 1) + "/" + dateObj.getDate();
+    }
+
+    function formatSafeTime(t) {
+      if (!t) return "";
+      let s = String(t);
+      if (s.includes("T") || s.includes("1899")) {
+        let dateObj = new Date(t);
+        return dateObj.getHours().toString().padStart(2, '0') + ":" + 
+               dateObj.getMinutes().toString().padStart(2, '0');
+      }
+      return s;
+    }
+
     window.onload = () => {
       fetch(`${APP_URL}?action=getTeachers`).then(r => r.json()).then(data => {
         const select = document.getElementById('myIdentity');
@@ -60,23 +71,33 @@
     };
 
     function onIdentitySelected() {
-      const name = document.getElementById('myIdentity').value;
-      if (!name) return;
+      const myName = document.getElementById('myIdentity').value;
+      if (!myName) {
+        document.getElementById('step2').style.display = 'none';
+        document.getElementById('courseContainer').innerHTML = "";
+        return;
+      }
       
       fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r => r.json()).then(data => {
-        // 過濾掉已有代課老師或已完成的課
+        // 【核心改動】過濾出：狀態為徵求/確認中、無代課老師、且「原指導者不是目前登入的老師」
         allAvailableCourses = data.filter(c => 
-          (c['狀態'] === '確認中' || c['狀態'] === '徵求中') && (!c['代課老師'] || c['代課老師'] === "")
+          (c['狀態'] === '確認中' || c['狀態'] === '徵求中') && 
+          (!c['代課老師'] || c['代課老師'] === "") &&
+          (c['指導者'] !== myName)
         );
 
         const dates = [...new Set(allAvailableCourses.map(c => c['日期']))].sort();
         const dateGrid = document.getElementById('dateGrid');
         
-        dateGrid.innerHTML = dates.map(d => `
-          <label class="date-pill">
-            <input type="checkbox" class="date-chk" value="${d}" onchange="renderCourses()">
-            <span>${d.split('-')[1]}/${d.split('-')[2]}</span>
-          </label>`).join('');
+        if (dates.length === 0) {
+          dateGrid.innerHTML = "<p style='font-size:14px; color:#999;'>目前暫無可代領的空缺課程。</p>";
+        } else {
+          dateGrid.innerHTML = dates.map(d => `
+            <label class="date-pill">
+              <input type="checkbox" class="date-chk" value="${d}" onchange="renderCourses()">
+              <span>${formatSafeDate(d)}</span>
+            </label>`).join('');
+        }
         
         document.getElementById('step2').style.display = 'block';
         renderCourses();
@@ -102,8 +123,8 @@
         <div class="course-card">
           <div class="course-title">${c['課程']}</div>
           <div class="course-info">
-            時段：${c['時間']} <br>
-            日期：${c['日期']} <br>
+            時段：${formatSafeTime(c['時間'])} <br>
+            日期：${formatSafeDate(c['日期'])} <br>
             <span class="teacher-small">原指導：${c['指導者']}</span>
           </div>
           <button class="btn-take" onclick="takeCourse('${c.rowId}', '${c['課程']}')">領取此堂代課</button>
@@ -118,7 +139,7 @@
       fetch(`${APP_URL}?action=takeCourse&rowId=${rowId}&subName=${encodeURIComponent(myName)}`)
         .then(r => r.text())
         .then(msg => {
-          alert("代課成功！系統已更新資料。");
+          alert("代課成功！");
           location.reload();
         });
     }
