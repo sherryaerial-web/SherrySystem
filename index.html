@@ -5,196 +5,118 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sherry Aerial 請假系統</title>
   <style>
-    :root { --primary: #34495e; --secondary: #2980b9; --bg: #f8fafb; --card: #ffffff; }
-    body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 15px; color: #444; margin: 0; }
-    .card { background: var(--card); padding: 20px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid rgba(0,0,0,0.02); }
-    h2 { color: var(--primary); margin-top: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 8px; margin-bottom: 15px; }
+    :root { --primary: #34495e; --bg: #f8fafb; --accent: #e67e22; }
+    body { font-family: -apple-system, "PingFang TC", sans-serif; background: var(--bg); padding: 15px; color: #444; }
+    .card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    h2 { color: var(--primary); font-size: 1.2rem; margin-top: 0; display: flex; align-items: center; gap: 8px; }
     h2::before { content: ""; width: 4px; height: 18px; background: var(--primary); border-radius: 10px; }
-    label { font-size: 14px; color: #7f8c8d; margin-bottom: 10px; display: block; font-weight: 500; }
-    select { width: 100%; padding: 14px; margin-bottom: 20px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; appearance: none; cursor: pointer; }
-    .date-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-    .date-pill { position: relative; }
-    .date-pill input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; z-index: 1; }
-    .date-pill span { display: inline-block; padding: 10px 14px; background: #fff; border: 1.5px solid #eee; border-radius: 50px; font-size: 14px; color: #555; text-align: center; min-width: 60px; transition: 0.2s; }
-    .date-pill input:checked + span { background: var(--primary); color: #fff; border-color: var(--primary); }
-    .course-list { background: #fcfcfc; border-radius: 15px; padding: 5px 15px; border: 1px dashed #eee; margin-bottom: 20px; min-height: 40px; }
-    .course-item { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #f1f1f1; }
-    .time-badge { background: #ebf5fb; color: var(--secondary); padding: 2px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; margin-left: 5px; }
-    button.submit-btn { width: 100%; padding: 16px; border-radius: 12px; border: none; font-size: 17px; font-weight: 600; cursor: pointer; background: var(--primary); color: white; }
-    .teacher-group { margin-bottom: 20px; border-radius: 15px; overflow: hidden; border: 1px solid #eee; background: #fff; }
-    .teacher-header { background: #f1f4f7; padding: 12px 15px; font-weight: bold; color: var(--primary); font-size: 14px; }
-    .board-item { display: flex; justify-content: space-between; padding: 12px 15px; border-bottom: 1px solid #f9f9f9; align-items: center; }
-    .status-badge { padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; }
+    select { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; }
+    .date-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .date-btn { padding: 10px 14px; background: #fff; border: 1.5px solid #eee; border-radius: 50px; font-size: 14px; cursor: pointer; }
+    .date-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .board-item { border-bottom: 1px solid #f0f0f0; padding: 12px 0; font-size: 0.95rem; }
+    .board-item:last-child { border: none; }
+    .tag { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; margin-left: 5px; }
+    .tag-wait { background: #fff3e0; color: #e67e22; }
+    .tag-done { background: #e8f5e9; color: #2e7d32; }
   </style>
 </head>
 <body>
-
   <div class="card">
-    <h2>請假登記</h2>
-    <label>1. 您是哪位老師？</label>
-    <select id="teacherSelect"><option value="">載入中...</option></select>
-    <div id="dateGrid" class="date-container"></div>
-    <div id="courseList" class="course-list">請先選取日期</div>
-    <button class="submit-btn" id="submitBtn" onclick="submitLeave()">送出請假申請</button>
+    <h2>📝 我要請假</h2>
+    <label style="font-size:14px; color:#7f8c8d;">1. 您是哪位老師？</label>
+    <select id="teacherSelect"><option>載入老師中...</option></select>
+    <div id="dateSection" style="display:none;">
+      <label style="font-size:14px; color:#7f8c8d;">2. 選擇請假日期：</label>
+      <div id="dateGrid" class="date-grid"></div>
+      <div id="courseList" style="margin-top:20px;"></div>
+      <button id="submitBtn" style="width:100%; background:var(--primary); color:white; border:none; padding:15px; border-radius:12px; font-weight:bold; margin-top:15px; display:none;" onclick="submitLeave()">送出請假登記</button>
+    </div>
   </div>
 
   <div class="card">
-    <h2>代課進度看板</h2>
-    <label>查看特定老師：</label>
-    <select id="boardFilter" onchange="renderBoard()"><option value="all">顯示全部老師</option></select>
-    <div id="board">正在更新進度...</div>
+    <h2>📋 代課進度看板</h2>
+    <div id="board">載入看板中...</div>
   </div>
 
   <script>
-    const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec"; 
-    let allLogData = []; 
-    let masterCourseList = [];
+    const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec";
+    let myCourses = [];
 
-    // 強力時間格式化：專治 1899-12-30 亂碼
+    function formatSafeDate(d) {
+      if (!d) return "";
+      let dateObj = new Date(d);
+      if (isNaN(dateObj)) return d;
+      const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+      return `${dateObj.getMonth() + 1}/${dateObj.getDate()} (${weekdays[dateObj.getDay()]})`;
+    }
+
     function formatSafeTime(t) {
-      if (!t) return "--:--";
+      if (!t) return "";
       let s = String(t);
       if (s.includes("T") || s.includes("1899")) {
-          let dateObj = new Date(t);
-          if (isNaN(dateObj.getTime())) return s;
-          return dateObj.getHours().toString().padStart(2, '0') + ":" + 
-                 dateObj.getMinutes().toString().padStart(2, '0');
+        let dateObj = new Date(t);
+        return dateObj.getHours().toString().padStart(2, '0') + ":" + dateObj.getMinutes().toString().padStart(2, '0');
       }
       return s;
     }
 
-    // 格式化日期為 M/D
-    function formatSafeDate(d) {
-      if (!d) return "";
-      let dateObj = new Date(d);
-      return (dateObj.getMonth() + 1) + "/" + dateObj.getDate();
-    }
-
     window.onload = () => {
-      // 1. 載入老師名單 (兩個選單都填入)
-      fetch(`${APP_URL}?action=getTeachers`).then(r => r.json()).then(data => {
-        const select = document.getElementById('teacherSelect');
-        const filter = document.getElementById('boardFilter');
-        const options = data.map(t => `<option value="${t['指導者']}">${t['指導者']}</option>`).join('');
-        select.innerHTML = '<option value="">請選擇您的名字</option>' + options;
-        filter.innerHTML = '<option value="all">🔍 顯示全部老師</option>' + options;
-        select.onchange = onTeacherChange;
+      fetch(`${APP_URL}?action=getTeachers`).then(r=>r.json()).then(data => {
+        const s = document.getElementById('teacherSelect');
+        s.innerHTML = '<option value="">請選擇您的名字</option>' + data.map(t=>`<option value="${t['指導者']}">${t['指導者']}</option>`).join('');
+        s.onchange = loadMyDates;
       });
-      
-      // 2. 初始載入看板資料
-      refreshBoardData();
+      refreshBoard();
     };
 
-    function refreshBoardData() {
-      fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r => r.json()).then(data => { 
-        allLogData = data; 
-        renderBoard(); 
-      });
-    }
-
-    function renderBoard() {
-      const board = document.getElementById('board');
-      const filterValue = document.getElementById('boardFilter').value;
-      
-      // 過濾資料
-      let items = allLogData.filter(c => c['指導者'] && c['指導者'] !== "指導者");
-      if (filterValue !== 'all') {
-          items = items.filter(c => c['指導者'] === filterValue);
-      }
-      items.reverse(); // 最新在最前
-
-      if (items.length === 0) {
-        board.innerHTML = "<div style='text-align:center;padding:20px;color:#999;'>目前暫無相關請假記錄</div>";
-        return;
-      }
-
-      // 按指導者分組
-      const groups = items.reduce((acc, obj) => {
-        const key = obj['指導者'];
-        if (!acc[key]) acc[key] = [];
-        acc[key].push(obj);
-        return acc;
-      }, {});
-
-      board.innerHTML = Object.keys(groups).map(teacher => `
-        <div class="teacher-group">
-          <div class="teacher-header">👤 ${teacher} 老師</div>
-          ${groups[teacher].map(l => {
-            const sub = (l['代課老師'] || "").trim();
-            const isDone = sub !== "";
-            return `
-              <div class="board-item">
-                <div>
-                  <strong>${formatSafeDate(l['日期'])} ${l['課程']}</strong><br>
-                  <small style="color:#999;">時段：${formatSafeTime(l['時間'])}</small>
-                </div>
-                <span class="status-badge" style="background:${isDone?'#e8f5e9':'#fff3e0'}; color:${isDone?'#2e7d32':'#ef6c00'};">
-                  ${isDone ? '代課：'+sub : (l['狀態'] || '確認中')}
-                </span>
-              </div>`;
-          }).join('')}
-        </div>`).join('');
-    }
-
-    // 處理請假登記的連動邏輯
-    function onTeacherChange() {
+    function loadMyDates() {
       const name = document.getElementById('teacherSelect').value;
-      const dateGrid = document.getElementById('dateGrid');
-      if (!name) return dateGrid.innerHTML = "";
-      dateGrid.innerHTML = "讀取課程日期中...";
-      
-      fetch(`${APP_URL}?action=getCourse`).then(r => r.json()).then(data => {
-        masterCourseList = data.filter(c => c['指導者'] === name);
-        const dates = [...new Set(masterCourseList.map(c => {
-            let d = new Date(c['日期']);
-            return d.getFullYear() + "-" + (d.getMonth()+1) + "-" + d.getDate();
-        }))].sort();
-
-        dateGrid.innerHTML = dates.map(dStr => `
-          <label class="date-pill">
-            <input type="checkbox" class="date-chk" value="${dStr}" onchange="updateSelectedCourses()">
-            <span>${dStr.split('-')[1]}/${dStr.split('-')[2]}</span>
-          </label>`).join('');
+      if(!name) return;
+      document.getElementById('dateSection').style.display = 'block';
+      fetch(`${APP_URL}?action=getCourse`).then(r=>r.json()).then(data => {
+        myCourses = data.filter(c => c['指導者'] === name);
+        // 按日期排序
+        const dates = [...new Set(myCourses.map(c => c['日期']))].sort((a,b) => new Date(a) - new Date(b));
+        document.getElementById('dateGrid').innerHTML = dates.map(d => `<button class="date-btn" onclick="showCourses('${d}', this)">${formatSafeDate(d)}</button>`).join('');
       });
     }
 
-    function updateSelectedCourses() {
-      const selectedDates = Array.from(document.querySelectorAll('.date-chk:checked')).map(el => el.value);
-      const listDiv = document.getElementById('courseList');
-      if (selectedDates.length === 0) return listDiv.innerHTML = "請先選取日期";
-
-      const filtered = masterCourseList.filter(c => {
-          let d = new Date(c['日期']);
-          let dStr = d.getFullYear() + "-" + (d.getMonth()+1) + "-" + d.getDate();
-          return selectedDates.includes(dStr);
-      });
-
-      listDiv.innerHTML = filtered.map(c => `
-        <div class="course-item">
-          <input type="checkbox" class="chk" data-raw='${JSON.stringify(c)}' checked>
-          <div class="info">
-            <strong>${c['課程']}</strong>
-            <span>${formatSafeDate(c['日期'])} <span class="time-badge">${formatSafeTime(c['時間'])}</span></span>
-          </div>
+    function showCourses(date, btn) {
+      document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const filtered = myCourses.filter(c => c['日期'] === date);
+      document.getElementById('courseList').innerHTML = filtered.map(c => `
+        <div style="padding:10px; border-bottom:1px solid #eee;">
+          <input type="checkbox" class="chk" data-raw='${JSON.stringify(c)}'> ${formatSafeTime(c['時間'])} - ${c['課程']}
         </div>`).join('');
+      document.getElementById('submitBtn').style.display = 'block';
+    }
+
+    function refreshBoard() {
+      fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r=>r.json()).then(data => {
+        const board = document.getElementById('board');
+        // 過濾掉標頭並按日期倒序排列（最新的在上面）
+        const items = data.filter(c => c['指導者'] && c['指導者'] !== "指導者").sort((a,b) => new Date(b['日期']) - new Date(a['日期']));
+        
+        board.innerHTML = items.map(l => {
+          const statusTag = l['代課老師'] ? `<span class="tag tag-done">已由 ${l['代課老師']} 領取</span>` : `<span class="tag tag-wait">徵求中</span>`;
+          return `
+          <div class="board-item">
+            <strong>${formatSafeDate(l['日期'])} ${formatSafeTime(l['時間'])}</strong><br>
+            <span style="color:#7f8c8d; font-size:0.85rem;">${l['課程']} (${l['指導者']} 老師請假)</span> ${statusTag}
+          </div>`;
+        }).join('');
+      });
     }
 
     function submitLeave() {
       const name = document.getElementById('teacherSelect').value;
       const chks = document.querySelectorAll('.chk:checked');
-      if (!name || chks.length === 0) return alert("請勾選要請假的課程");
-
-      const selected = Array.from(chks).map(el => {
-          let raw = JSON.parse(el.getAttribute('data-raw'));
-          return { "日期": raw['日期'], "時間": raw['時間'], "課程": raw['課程'] };
-      });
-
-      if (!confirm(`確定提交這 ${selected.length} 堂課的請假申請嗎？`)) return;
-      const btn = document.getElementById('submitBtn');
-      btn.innerText = "提交中..."; btn.disabled = true;
-
+      if (chks.length === 0) return alert("請勾選要請假的課程");
+      const selected = Array.from(chks).map(el => JSON.parse(el.getAttribute('data-raw')));
       fetch(`${APP_URL}?instructor=${encodeURIComponent(name)}&items=${encodeURIComponent(JSON.stringify(selected))}`)
-        .then(() => { alert("提交成功！"); location.reload(); });
+        .then(() => { alert("請假資料已送出"); location.reload(); });
     }
   </script>
 </body>
