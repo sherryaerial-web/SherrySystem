@@ -5,143 +5,112 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sherry Aerial 代課領取系統</title>
   <style>
-    :root { --success: #27ae60; --primary: #34495e; --bg: #f8fafb; }
-    body { font-family: -apple-system, "PingFang TC", sans-serif; background: var(--bg); padding: 15px; color: #444; }
-    .card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
-    h2 { color: var(--primary); font-size: 1.2rem; margin-top: 0; display: flex; align-items: center; gap: 8px; }
-    h2::before { content: ""; width: 4px; height: 18px; background: var(--primary); border-radius: 10px; }
-    label { font-size: 14px; color: #7f8c8d; margin-bottom: 8px; display: block; font-weight: 500; }
-    select { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; appearance: none; }
-    .date-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-    .date-pill { position: relative; }
-    .date-pill input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
-    .date-pill span { display: inline-block; padding: 10px 14px; background: #fff; border: 1.5px solid #eee; border-radius: 50px; font-size: 14px; transition: 0.2s; }
-    .date-pill input:checked + span { background: var(--primary); color: #fff; border-color: var(--primary); }
-    .course-card { background: white; border-radius: 18px; padding: 18px; margin-bottom: 15px; border: 1px solid rgba(0,0,0,0.03); box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
-    .course-title { font-size: 1.15rem; font-weight: 800; color: #2c3e50; margin-bottom: 8px; }
-    .course-info { font-size: 0.9rem; color: #7f8c8d; line-height: 1.6; margin-bottom: 15px; }
-    .teacher-small { font-size: 0.75rem; color: #bdc3c7; background: #f8f9fa; padding: 2px 6px; border-radius: 4px; }
-    .btn-take { width: 100%; background: var(--success); color: white; border: none; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    :root { --primary: #2c3e50; --bg: #f4f7f6; --action: #27ae60; }
+    body { font-family: -apple-system, "PingFang TC", sans-serif; background: var(--bg); padding: 15px; color: #333; }
+    .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); margin-bottom: 15px; }
+    h2 { color: var(--primary); font-size: 1.2rem; margin-top: 0; border-left: 4px solid var(--action); padding-left: 10px; }
+    select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #ddd; font-size: 16px; margin-bottom: 20px; background: #fff; }
+    
+    .course-card { border: 1px solid #eee; padding: 15px; border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; transition: 0.3s; }
+    .course-card:hover { border-color: var(--action); background: #f9fffb; }
+    .course-info { flex-grow: 1; }
+    .course-date { font-weight: 800; color: #2c3e50; font-size: 1.1rem; }
+    .course-detail { font-size: 0.9rem; color: #7f8c8d; margin-top: 4px; }
+    
+    .sub-btn { background: var(--action); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    .sub-btn:hover { background: #219150; transform: scale(1.05); }
+    .sub-btn:disabled { background: #ccc; cursor: not-allowed; }
+    
+    .loading { text-align: center; color: #999; padding: 40px; }
   </style>
 </head>
 <body>
 
   <div class="card">
-    <h2>代課老師報到</h2>
-    <label>您是哪位老師？</label>
-    <select id="myIdentity"><option value="">載入中...</option></select>
-    
-    <div id="step2" style="display:none;">
-      <label>選擇您可以代課的日期 (可複選)：</label>
-      <div id="dateGrid" class="date-container"></div>
+    <h2>👤 領取身分</h2>
+    <label>請選擇您的名字 (代課老師)：</label>
+    <select id="subTeacherSelect">
+      <option value="">載入中...</option>
+    </select>
+  </div>
+
+  <div id="listArea">
+    <div class="card">
+      <h2>📢 待領取課表</h2>
+      <div id="courseList" class="loading">正在搜尋待代課清單...</div>
     </div>
   </div>
 
-  <div id="courseContainer"></div>
-
   <script>
+    // 請確保與妳的 GAS 網址一致
     const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec";
-    let allAvailableCourses = [];
-
-    function formatSafeDate(d) {
-      if (!d) return "";
-      let dateObj = new Date(d);
-      if (isNaN(dateObj)) return d;
-      return (dateObj.getMonth() + 1) + "/" + dateObj.getDate();
-    }
-
-    function formatSafeTime(t) {
-      if (!t) return "";
-      let s = String(t);
-      if (s.includes("T") || s.includes("1899")) {
-        let dateObj = new Date(t);
-        return dateObj.getHours().toString().padStart(2, '0') + ":" + 
-               dateObj.getMinutes().toString().padStart(2, '0');
-      }
-      return s;
-    }
 
     window.onload = () => {
+      // 1. 載入老師名單 (用於選擇代課老師身分)
       fetch(`${APP_URL}?action=getTeachers`).then(r => r.json()).then(data => {
-        const select = document.getElementById('myIdentity');
-        select.innerHTML = '<option value="">請選取您的名字</option>' + 
+        const s = document.getElementById('subTeacherSelect');
+        s.innerHTML = '<option value="">-- 我是哪位老師？ --</option>' + 
           data.map(t => `<option value="${t['指導者']}">${t['指導者']}</option>`).join('');
-        select.onchange = onIdentitySelected;
       });
+
+      // 2. 載入待代課清單 (工作表1 中「代課老師」欄位為空的資料)
+      loadAvailableCourses();
     };
 
-    function onIdentitySelected() {
-      const myName = document.getElementById('myIdentity').value;
-      if (!myName) {
-        document.getElementById('step2').style.display = 'none';
-        document.getElementById('courseContainer').innerHTML = "";
-        return;
-      }
-      
-      fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r => r.json()).then(data => {
-        allAvailableCourses = data.filter(c => 
-          (c['狀態'] === '確認中' || c['狀態'] === '徵求中') && 
-          (!c['代課老師'] || c['代課老師'] === "") &&
-          (c['指導者'] !== myName)
-        );
-
-        const dates = [...new Set(allAvailableCourses.map(c => c['日期']))].sort();
-        const dateGrid = document.getElementById('dateGrid');
+    function loadAvailableCourses() {
+      const container = document.getElementById('courseList');
+      fetch(`${APP_URL}?action=getCourse`).then(r => r.json()).then(data => {
+        // 過濾出「還沒有代課老師」的請假紀錄
+        const available = data.filter(c => !c['代課老師'] || c['代課老師'].trim() === "");
         
-        if (dates.length === 0) {
-          dateGrid.innerHTML = "<p style='font-size:14px; color:#999;'>目前暫無可代領的空缺課程。</p>";
-        } else {
-          dateGrid.innerHTML = dates.map(d => `
-            <label class="date-pill">
-              <input type="checkbox" class="date-chk" value="${d}" onchange="renderCourses()">
-              <span>${formatSafeDate(d)}</span>
-            </label>`).join('');
+        if (available.length === 0) {
+          container.innerHTML = "目前暫時沒有待領取的課程。";
+          return;
         }
-        
-        document.getElementById('step2').style.display = 'block';
-        renderCourses();
+
+        container.innerHTML = available.map(c => `
+          <div class="course-card">
+            <div class="course-info">
+              <div class="course-date">${c['日期']} (${c['時間']})</div>
+              <div class="course-detail">
+                原指導者：<strong>${c['指導者']}</strong><br>
+                課程名稱：${c['課程']}
+              </div>
+            </div>
+            <button class="sub-btn" onclick="claimCourse('${encodeURIComponent(JSON.stringify(c))}')">領取</button>
+          </div>
+        `).join('');
       });
     }
 
-    function renderCourses() {
-      const selectedDates = Array.from(document.querySelectorAll('.date-chk:checked')).map(el => el.value);
-      const container = document.getElementById('courseContainer');
-      const filtered = allAvailableCourses.filter(c => selectedDates.includes(c['日期']));
-      
-      if (selectedDates.length === 0) {
-        container.innerHTML = "";
-        return;
-      }
+    function claimCourse(encodedData) {
+      const subName = document.getElementById('subTeacherSelect').value;
+      if (!subName) return alert("請先在上方選擇您的名字！");
 
-      if (filtered.length === 0) {
-        container.innerHTML = "<div class='card' style='text-align:center;color:#999;font-size:14px;'>選取日期暫無待領課程</div>";
-        return;
-      }
+      const courseData = JSON.parse(decodeURIComponent(encodedData));
+      if (!confirm(`確定要領取 ${courseData['指導者']} 老師在 ${courseData['日期']} 的這堂課嗎？`)) return;
 
-      // --- 在這裡交換了日期與時間的順序 ---
-      container.innerHTML = filtered.map(c => `
-        <div class="course-card">
-          <div class="course-title">${c['課程']}</div>
-          <div class="course-info">
-            日期：${formatSafeDate(c['日期'])} <br>
-            時段：${formatSafeTime(c['時間'])} <br>
-            <span class="teacher-small">原指導：${c['指導者']}</span>
-          </div>
-          <button class="btn-take" onclick="takeCourse('${c.rowId}', '${c['課程']}')">領取此堂代課</button>
-        </div>
-      `).join('');
-    }
+      // 傳送領取請求給 GAS
+      // 參數：action, subTeacher (代課老師), rowData (原始資料以進行比對)
+      const params = new URLSearchParams({
+        action: "subClaim",
+        subTeacher: subName,
+        date: courseData['日期'],
+        time: courseData['時間'],
+        instructor: courseData['指導者']
+      });
 
-    function takeCourse(rowId, courseName) {
-      const myName = document.getElementById('myIdentity').value;
-      if (!confirm(`確認由您（${myName} 老師）領取「${courseName}」代課嗎？`)) return;
-
-      fetch(`${APP_URL}?action=takeCourse&rowId=${rowId}&subName=${encodeURIComponent(myName)}`)
-        .then(r => r.text())
-        .then(msg => {
-          alert("代課成功！");
-          location.reload();
-        });
+      fetch(`${APP_URL}?${params.toString()}`)
+        .then(r => r.json())
+        .then(res => {
+          if (res.status === "success") {
+            alert("領取成功！資料已同步至 Excel。");
+            location.reload();
+          } else {
+            alert("領取失敗：" + (res.message || "未知錯誤"));
+          }
+        })
+        .catch(err => alert("網路錯誤，請稍後再試。"));
     }
   </script>
 </body>
