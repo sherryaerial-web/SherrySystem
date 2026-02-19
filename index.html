@@ -15,26 +15,48 @@
     /* 質感下拉選單 */
     select { width: 100%; padding: 14px; margin-bottom: 20px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; appearance: none; }
     
-    /* 膠囊日期選擇區 */
-    .date-container { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-    .date-pill { position: relative; }
-    .date-pill input { position: absolute; opacity: 0; width: 0; height: 0; }
-    .date-pill span { display: inline-block; padding: 10px 16px; background: #fff; border: 1.5px solid #eee; border-radius: 50px; font-size: 14px; color: #666; transition: all 0.2s ease; cursor: pointer; text-align: center; min-width: 80px; }
-    
-    /* 選中狀態 */
-    .date-pill input:checked + span { background: var(--primary); color: #fff; border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(52, 73, 94, 0.2); }
+    /* 膠囊日期選擇區 - 自然流動排版 */
+    .date-container { 
+      display: flex; 
+      flex-wrap: wrap; /* 自動換行 */
+      gap: 10px; 
+      margin-bottom: 20px;
+      padding: 5px 2px;
+    }
+    .date-pill { position: relative; flex: 0 0 auto; }
+    .date-pill input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; z-index: 1; }
+    .date-pill span { 
+      display: inline-block; 
+      padding: 8px 16px; 
+      background: #fff; 
+      border: 1.5px solid #eee; 
+      border-radius: 50px; 
+      font-size: 14px; 
+      color: #555; 
+      transition: all 0.2s ease; 
+      text-align: center;
+      min-width: 60px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .date-pill input:checked + span { 
+      background: var(--primary); 
+      color: #fff; 
+      border-color: var(--primary); 
+      transform: translateY(-2px); 
+      box-shadow: 0 4px 10px rgba(52, 73, 94, 0.2); 
+    }
 
     /* 課程列表區 */
     .course-list { background: #fcfcfc; border-radius: 15px; padding: 5px 15px; border: 1px dashed #eee; }
     .course-item { display: flex; align-items: center; padding: 16px 0; border-bottom: 1px solid #f1f1f1; }
     .course-item:last-child { border-bottom: none; }
-    .course-item input { width: 20px; height: 20px; margin-right: 15px; accent-color: var(--primary); }
+    .course-item input { width: 22px; height: 22px; margin-right: 15px; accent-color: var(--primary); }
     .course-item .info { flex: 1; }
     .course-item .info strong { font-size: 15px; display: block; color: #333; }
     .course-item .info span { font-size: 13px; color: #888; }
     .time-badge { background: #ebf5fb; color: var(--secondary); padding: 2px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; margin-left: 5px; }
 
-    button.submit-btn { width: 100%; padding: 16px; border-radius: 12px; border: none; font-size: 17px; font-weight: 600; cursor: pointer; background: var(--primary); color: white; margin-top: 15px; box-shadow: 0 4px 15px rgba(52, 73, 94, 0.2); }
+    button.submit-btn { width: 100%; padding: 16px; border-radius: 12px; border: none; font-size: 17px; font-weight: 600; cursor: pointer; background: var(--primary); color: white; margin-top: 15px; box-shadow: 0 4px 15px rgba(52, 73, 94, 0.2); transition: 0.3s; }
     button.submit-btn:disabled { background: #ccc; box-shadow: none; }
 
     /* 看板 */
@@ -48,13 +70,13 @@
     <h2>請假登記</h2>
     
     <label>1. 您是哪位老師？</label>
-    <select id="teacherSelect"><option value="">讀取中...</option></select>
+    <select id="teacherSelect"><option value="">讀取名單中...</option></select>
     
-    <label id="dateLabel">2. 選擇日期 (可複選)</label>
+    <label>2. 選擇日期 (可複選)</label>
     <div id="dateGrid" class="date-container">請先選擇名字...</div>
     
     <label>3. 確認請假課程</label>
-    <div id="courseList" class="course-list">請先選取日期</div>
+    <div id="courseList" class="course-list">請先勾選日期</div>
     
     <button class="submit-btn" id="submitBtn" onclick="submitLeave()">送出請假申請</button>
   </div>
