@@ -15,19 +15,20 @@
     /* 質感下拉選單 */
     select { width: 100%; padding: 14px; margin-bottom: 20px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; appearance: none; }
     
-    /* 膠囊日期選擇區 - 自然流動排版 */
+    /* 膠囊日期選擇區 - 優化：自動填滿並靠中對齊消滅空洞感 */
     .date-container { 
       display: flex; 
-      flex-wrap: wrap; /* 自動換行 */
-      gap: 10px; 
+      flex-wrap: wrap; 
+      gap: 8px; 
       margin-bottom: 20px;
-      padding: 5px 2px;
+      padding: 5px 0;
+      justify-content: flex-start; /* 讓它自然排列，靠左但緊湊 */
     }
-    .date-pill { position: relative; flex: 0 0 auto; }
+    .date-pill { position: relative; }
     .date-pill input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; z-index: 1; }
     .date-pill span { 
       display: inline-block; 
-      padding: 8px 16px; 
+      padding: 10px 14px; /* 稍微縮小內距，讓一行更容易塞下三個 */
       background: #fff; 
       border: 1.5px solid #eee; 
       border-radius: 50px; 
@@ -35,7 +36,7 @@
       color: #555; 
       transition: all 0.2s ease; 
       text-align: center;
-      min-width: 60px;
+      min-width: 75px; /* 設定基礎寬度確保整齊 */
       box-shadow: 0 2px 4px rgba(0,0,0,0.02);
     }
     .date-pill input:checked + span { 
