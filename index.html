@@ -3,58 +3,184 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sherry Aerial 系統</title>
+  <title>Sherry Aerial 請假系統</title>
   <style>
-    :root { --primary: #34495e; --bg: #f8fafb; --success: #27ae60; }
-    body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 15px; color: #444; }
-    .card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
-    h2 { color: var(--primary); font-size: 1.2rem; margin-top: 0; display: flex; align-items: center; gap: 8px; }
-    h2::before { content: ""; width: 4px; height: 18px; background: var(--primary); border-radius: 10px; }
-    label { font-size: 14px; color: #7f8c8d; margin-bottom: 8px; display: block; }
-    select { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; appearance: none; }
-    .date-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    :root { --primary: #34495e; --bg: #f8fafb; --accent: #e67e22; --success: #27ae60; }
+    body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 15px; color: #444; line-height: 1.5; }
+    .card { background: white; padding: 22px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    h2 { color: var(--primary); font-size: 1.25rem; margin-top: 0; display: flex; align-items: center; gap: 10px; }
+    h2::before { content: ""; width: 5px; height: 20px; background: var(--primary); border-radius: 10px; }
+    
+    label { font-size: 14px; color: #7f8c8d; margin-bottom: 10px; display: block; font-weight: 500; }
+    select { width: 100%; padding: 14px; margin-bottom: 10px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; appearance: none; transition: 0.3s; }
+    select:focus { border-color: var(--primary); outline: none; }
+
+    /* 日期按鈕區 */
+    .date-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
     .date-pill { position: relative; cursor: pointer; }
     .date-pill input { position: absolute; opacity: 0; width: 0; height: 0; }
-    .date-pill span { display: inline-block; padding: 10px 14px; background: #fff; border: 1.5px solid #eee; border-radius: 50px; font-size: 14px; transition: 0.2s; }
-    .date-pill input:checked + span { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .date-pill span { display: inline-block; padding: 12px 18px; background: #fff; border: 1.5px solid #eee; border-radius: 50px; font-size: 14px; transition: 0.2s; font-weight: 500; }
+    .date-pill input:checked + span { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 4px 12px rgba(52, 73, 94, 0.2); }
+
+    /* 課程勾選清單 */
+    .course-item { padding: 15px; border-bottom: 1px solid #f5f5f5; display: flex; align-items: center; gap: 12px; animation: fadeIn 0.3s; }
+    .course-item:last-child { border: none; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* 看板項目 */
     .board-item { border-bottom: 1px solid #f0f0f0; padding: 18px 0; }
-    .board-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .board-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
     .board-time { font-size: 1.05rem; font-weight: 800; color: #2c3e50; }
-    .tag { font-size: 0.75rem; padding: 4px 10px; border-radius: 50px; font-weight: bold; }
+    
+    .tag { font-size: 0.75rem; padding: 5px 12px; border-radius: 50px; font-weight: bold; white-space: nowrap; }
     .tag-wait { background: #fff3e0; color: #e67e22; border: 1px solid #ffe0b2; }
     .tag-done { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
-    .submit-btn { width: 100%; background: var(--primary); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; margin-top: 20px; cursor: pointer; }
-    .debug-info { font-size: 11px; color: #ccc; margin-top: 10px; font-family: monospace; }
+
+    .submit-btn { width: 100%; background: var(--primary); color: white; border: none; padding: 16px; border-radius: 15px; font-size: 16px; font-weight: bold; margin-top: 25px; cursor: pointer; transition: 0.3s; }
+    .submit-btn:hover { background: #2c3e50; }
+    .loading-text { color: #bdc3c7; font-size: 14px; text-align: center; padding: 20px; }
   </style>
 </head>
 <body>
 
   <div class="card">
     <h2>👤 身份驗證</h2>
-    <label>請先選擇您的名字：</label>
-    <select id="teacherSelect"><option>載入老師名單中...</option></select>
+    <label>第一步：請選取您的名字</label>
+    <select id="teacherSelect">
+      <option value="">正在讀取老師名單...</option>
+    </select>
   </div>
 
-  <div id="mainContent" style="display:none;">
+  <div id="mainUI" style="display:none;">
     <div class="card">
       <h2>📝 我要請假</h2>
-      <label>1. 選擇請假日期 (可複選)：</label>
-      <div id="dateGrid" class="date-grid">載入日期中...</div>
-      <div id="courseList" style="margin-top:20px;"></div>
-      <button id="submitBtn" class="submit-btn" style="display:none;" onclick="submitLeave()">送出請假登記</button>
+      <label>1. 選擇日期 (可複選)：</label>
+      <div id="dateGrid" class="date-grid"></div>
+      
+      <div id="courseChoiceSection" style="margin-top:25px; display:none;">
+        <label>2. 勾選欲請假的課程時段：</label>
+        <div id="courseListArea"></div>
+        <button id="submitBtn" class="submit-btn" onclick="submitLeave()">送出請假登記</button>
+      </div>
     </div>
 
     <div class="card">
       <h2>📋 我的代課進度看板</h2>
-      <div id="board">正在讀取進度...</div>
+      <div id="boardArea"></div>
     </div>
   </div>
 
   <script>
+    // 請確認此網址與妳 GAS 部署的網址一致
     const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec";
-    let myTeacherCourses = [];
+    let myRawCourses = [];
 
-    function formatSafeDate(d) {
+    // 初始化：載入老師名單
+    window.onload = () => {
+      fetch(`${APP_URL}?action=getTeachers`)
+        .then(r => r.json())
+        .then(data => {
+          const select = document.getElementById('teacherSelect');
+          select.innerHTML = '<option value="">-- 請選擇您的名字 --</option>' + 
+            data.map(t => `<option value="${t['指導者']}">${t['指導者']}</option>`).join('');
+          select.onchange = onUserChanged;
+        });
+    };
+
+    // 當老師切換名字時
+    function onUserChanged() {
+      const name = document.getElementById('teacherSelect').value.trim();
+      if (!name) {
+        document.getElementById('mainUI').style.display = 'none';
+        return;
+      }
+
+      document.getElementById('mainUI').style.display = 'block';
+      document.getElementById('dateGrid').innerHTML = '<div class="loading-text">讀取課表中...</div>';
+      document.getElementById('boardArea').innerHTML = '<div class="loading-text">同步進度中...</div>';
+
+      // 同時發出兩個請求：一個抓原始課表(CourseList)，一個抓請假紀錄(工作表1)
+      Promise.all([
+        fetch(`${APP_URL}?action=getCourseList`).then(r => r.json()),
+        fetch(`${APP_URL}?action=getBoard`).then(r => r.json())
+      ]).then(([rawList, boardData]) => {
+        // 處理請假選單 (來自 CourseList)
+        myRawCourses = rawList.filter(c => String(c['指導者']).trim() === name && c['日期']);
+        renderDateButtons();
+
+        // 處理看板紀錄 (來自 工作表1)
+        renderPersonalBoard(boardData, name);
+      });
+    }
+
+    // 渲染日期按鈕
+    function renderDateButtons() {
+      const dates = [...new Set(myRawCourses.map(c => c['日期']))].sort((a, b) => new Date(a) - new Date(b));
+      const grid = document.getElementById('dateGrid');
+      
+      if (dates.length === 0) {
+        grid.innerHTML = '<div class="loading-text">CourseList 中找不到您的課程資料。</div>';
+        return;
+      }
+
+      grid.innerHTML = dates.map(d => `
+        <label class="date-pill">
+          <input type="checkbox" class="date-chk" value="${d}" onchange="refreshCourseList()">
+          <span>${formatDate(d)}</span>
+        </label>`).join('');
+    }
+
+    // 根據選中的日期顯示細節
+    function refreshCourseList() {
+      const selectedDates = Array.from(document.querySelectorAll('.date-chk:checked')).map(el => el.value);
+      const section = document.getElementById('courseChoiceSection');
+      const container = document.getElementById('courseListArea');
+
+      if (selectedDates.length === 0) {
+        section.style.display = 'none';
+        return;
+      }
+
+      section.style.display = 'block';
+      const filtered = myRawCourses.filter(c => selectedDates.includes(c['日期']));
+      
+      container.innerHTML = filtered.map(c => `
+        <div class="course-item">
+          <input type="checkbox" class="chk-item" style="width:20px; height:20px;" data-raw='${JSON.stringify(c)}'> 
+          <div>
+            <div style="font-weight:600;">${formatDate(c['日期'])}</div>
+            <div style="font-size:14px; color:#666;">${formatTime(c['時間'])} - ${c['課程']}</div>
+          </div>
+        </div>`).join('');
+    }
+
+    // 渲染看板
+    function renderPersonalBoard(data, name) {
+      const area = document.getElementById('boardArea');
+      const myLogs = data.filter(c => String(c['指導者']).trim() === name)
+                         .sort((a, b) => new Date(b['日期']) - new Date(a['日期']));
+      
+      if (myLogs.length === 0) {
+        area.innerHTML = '<div class="loading-text">目前尚無請假紀錄。</div>';
+        return;
+      }
+
+      area.innerHTML = myLogs.map(l => {
+        const statusClass = l['代課老師'] ? 'tag-done' : 'tag-wait';
+        const statusText = l['代課老師'] ? `✔ ${l['代課老師']} 已領取` : '⏳ 確認中';
+        return `
+          <div class="board-item">
+            <div class="board-header">
+              <span class="board-time">${formatDate(l['日期'])} ${formatTime(l['時間'])}</span>
+              <span class="tag ${statusClass}">${statusText}</span>
+            </div>
+            <div style="color:#7f8c8d; font-size:14px;">課程：${l['課程']}</div>
+          </div>`;
+      }).join('');
+    }
+
+    // 工具：格式化日期
+    function formatDate(d) {
       if (!d) return "";
       let dateObj = new Date(d);
       if (isNaN(dateObj.getTime())) return d;
@@ -62,7 +188,8 @@
       return `${dateObj.getMonth() + 1}/${dateObj.getDate()} (${weekdays[dateObj.getDay()]})`;
     }
 
-    function formatSafeTime(t) {
+    // 工具：格式化時間
+    function formatTime(t) {
       if (!t) return "";
       let s = String(t);
       if (s.includes("T") || s.includes("1899")) {
@@ -72,107 +199,20 @@
       return s;
     }
 
-    window.onload = () => {
-      fetch(`${APP_URL}?action=getTeachers`).then(r=>r.json()).then(data => {
-        const s = document.getElementById('teacherSelect');
-        s.innerHTML = '<option value="">請選取您的名字</option>' + data.map(t=>`<option value="${t['指導者']}">${t['指導者']}</option>`).join('');
-        s.onchange = onIdentityVerified;
-      }).catch(err => {
-        document.getElementById('teacherSelect').innerHTML = "<option>API 連線失敗，請檢查網址或權限</option>";
-      });
-    };
-
-    function onIdentityVerified() {
-      const name = document.getElementById('teacherSelect').value.trim();
-      const mainContent = document.getElementById('mainContent');
-      const dateGrid = document.getElementById('dateGrid');
-      
-      if(!name) { mainContent.style.display = 'none'; return; }
-      
-      mainContent.style.display = 'block';
-      dateGrid.innerHTML = "正在通訊中...";
-      
-      fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r=>r.json()).then(data => {
-        // --- 強化比對邏輯：移除名字兩端空白 ---
-        myTeacherCourses = data.filter(c => {
-          let instructor = String(c['指導者'] || "").trim();
-          return instructor === name && c['日期'];
-        });
-        
-        const dates = [...new Set(myTeacherCourses.map(c => c['日期']))].sort((a,b) => new Date(a) - new Date(b));
-        
-        if (dates.length === 0) {
-          // 除錯模式：如果找不到，顯示後台抓到了哪些欄位名
-          let keys = data.length > 0 ? Object.keys(data[0]).join(', ') : "無資料";
-          dateGrid.innerHTML = `<div><p style='color:#e74c3c;font-size:14px;'>找不到課程。請檢查 Excel 標題列是否包含「指導者」與「日期」。</p><div class='debug-info'>系統目前讀取到的欄位有：${keys}</div></div>`;
-        } else {
-          dateGrid.innerHTML = dates.map(d => `
-            <label class="date-pill">
-              <input type="checkbox" class="date-chk" value="${d}" onchange="renderCourseChoices()">
-              <span>${formatSafeDate(d)}</span>
-            </label>`).join('');
-        }
-        
-        renderMyBoard(data, name);
-      }).catch(err => {
-        dateGrid.innerHTML = "讀取失敗，請確認網址是否正確。";
-      });
-    }
-
-    function renderCourseChoices() {
-      const selectedDates = Array.from(document.querySelectorAll('.date-chk:checked')).map(el => el.value);
-      const container = document.getElementById('courseList');
-      const submitBtn = document.getElementById('submitBtn');
-
-      if (selectedDates.length === 0) {
-        container.innerHTML = "";
-        submitBtn.style.display = 'none';
-        return;
-      }
-
-      const filtered = myTeacherCourses.filter(c => selectedDates.includes(c['日期']));
-      container.innerHTML = `<label style="margin-top:15px;">2. 勾選欲請假的時段：</label>` + filtered.map(c => `
-        <div style="padding:12px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px;">
-          <input type="checkbox" class="chk-item" style="width:18px; height:18px;" data-raw='${JSON.stringify(c)}'> 
-          <span><strong>${formatSafeDate(c['日期'])}</strong> ${formatSafeTime(c['時間'])} - ${c['課程']}</span>
-        </div>`).join('');
-      submitBtn.style.display = 'block';
-    }
-
-    function renderMyBoard(allData, myName) {
-      const board = document.getElementById('board');
-      const myLogs = allData.filter(c => {
-        let instructor = String(c['指導者'] || "").trim();
-        return instructor === myName && (c['代課老師'] || c['狀態'] === "確認中");
-      }).sort((a,b) => new Date(b['日期']) - new Date(a['日期']));
-      
-      if(myLogs.length === 0) {
-        board.innerHTML = "<div style='text-align:center;color:#999;padding:20px;font-size:14px;'>目前暫無您的請假紀錄。</div>";
-        return;
-      }
-
-      board.innerHTML = myLogs.map(l => {
-        const status = l['代課老師'] ? `<span class="tag tag-done">已由 ${l['代課老師']} 領取</span>` : `<span class="tag tag-wait">⏳ 確認中</span>`;
-        return `
-        <div class="board-item">
-          <div class="board-header">
-            <span class="board-time">${formatSafeDate(l['日期'])} ${formatSafeTime(l['時間'])}</span>
-            ${status}
-          </div>
-          <div style="color:#7f8c8d; font-size:0.9rem;">課程：${l['課程']}</div>
-        </div>`;
-      }).join('');
-    }
-
+    // 送出請假
     function submitLeave() {
       const name = document.getElementById('teacherSelect').value;
       const chks = document.querySelectorAll('.chk-item:checked');
-      if (chks.length === 0) return alert("請至少勾選一個時段");
-      if (!confirm("確定送出請假申請？")) return;
-      
+      if (chks.length === 0) return alert("請勾選要請假的時段");
+      if (!confirm("確定要送出這些時段的請假申請嗎？")) return;
+
       const selected = Array.from(chks).map(el => JSON.parse(el.getAttribute('data-raw')));
+      
       fetch(`${APP_URL}?instructor=${encodeURIComponent(name)}&items=${encodeURIComponent(JSON.stringify(selected))}`)
-        .then(() => { alert("登記成功！"); location.reload(); });
+        .then(() => {
+          alert("登記成功！");
+          location.reload();
+        });
     }
   </script>
 </body>
