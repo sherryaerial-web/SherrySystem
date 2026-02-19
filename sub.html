@@ -3,77 +3,50 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sherry Aerial 代課領取系統</title>
+  <title>代課領取端</title>
   <style>
-    :root { --success: #27ae60; --primary: #34495e; --bg: #f4f7f6; }
-    body { font-family: -apple-system, sans-serif; background: var(--bg); padding: 15px; }
-    .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
-    h2 { color: var(--primary); border-left: 4px solid var(--primary); padding-left: 10px; margin-bottom: 20px; }
-    .course-box { border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 15px; background: #fff; }
-    .info strong { font-size: 1.1rem; color: #2c3e50; }
-    .ask-info { color: #d35400; font-weight: bold; background: #fff3e0; padding: 5px 10px; border-radius: 6px; display: inline-block; margin: 10px 0; font-size: 0.9rem; }
-    .take-btn { width: 100%; background: var(--success); color: white; border: none; padding: 14px; border-radius: 10px; font-size: 1rem; font-weight: bold; cursor: pointer; }
-    .time-badge { background: #e8f4fd; color: #2980b9; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+    body { font-family: sans-serif; background: #f4f7f6; padding: 15px; }
+    .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+    .item { border: 1px solid #eee; padding: 15px; border-radius: 10px; margin-top: 15px; }
+    .btn { width: 100%; background: #27ae60; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
   </style>
 </head>
 <body>
+  <div class="card">
+    <h2>🙋 待領取代課清單</h2>
+    <div id="list">讀取中...</div>
+  </div>
 
-<div class="card">
-  <h2>🙋 待領取課表</h2>
-  <div id="subList">讀取中...</div>
-</div>
+  <script>
+    const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec";
 
-<script>
-  // 請更換為妳最新的 GAS Web App 網址
-  const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec"; 
-
-  function formatSafeTime(t) {
-    if (!t) return "--:--";
-    let s = String(t);
-    if (s.includes("T") || s.includes("1899")) {
-        let d = new Date(t);
-        return d.getHours().toString().padStart(2, '0') + ":" + d.getMinutes().toString().padStart(2, '0');
-    }
-    return s;
-  }
-
-  window.onload = () => {
-    fetch(`${APP_URL}?action=getCourse&isAdmin=true`)
-      .then(r => r.json())
-      .then(data => {
-        // 同時檢查「徵求中」或「確認中」，且 G 欄是空的才顯示
-        const list = data.filter(c => (c['狀態'] === '確認中' || c['狀態'] === '徵求中') && (!c['代課老師'] || c['代課老師'] === ""));
-        const container = document.getElementById('subList');
-        
-        if(list.length === 0) {
-          container.innerHTML = "目前暫無空缺課程。";
-          return;
-        }
-
-        container.innerHTML = list.map(item => `
-          <div class="course-box">
-            <div class="info">
+    function load() {
+      const container = document.getElementById('list');
+      fetch(`${APP_URL}?action=getCourse&isAdmin=true`)
+        .then(r => r.json())
+        .then(data => {
+          const available = data.filter(c => c['狀態'] === '確認中' && (!c['代課老師'] || c['代課老師'] === ""));
+          if (available.length === 0) { container.innerHTML = "目前暫無空缺課程。"; return; }
+          container.innerHTML = available.map(item => `
+            <div class="item">
               <strong>${item['指導者']} 老師</strong><br>
               課程：${item['課程']}<br>
-              日期：${item['日期'].split('T')[0]} <span class="time-badge">${formatSafeTime(item['時間'])}</span><br>
-              <div class="ask-info">📢 目前優先詢問：${item['最後詢問對象'] || '等待排隊中'}</div>
+              時間：${item['日期']} (${item['時間']})<br>
+              <div style="color:orange;">📢 優先詢問：${item['最後詢問對象'] || '等候中'}</div>
+              <button class="btn" onclick="take('${item.rowId}')">確認領取代課</button>
             </div>
-            <button class="take-btn" onclick="takeCourse('${item.rowId}', '${item['課程']}')">我已確認代課</button>
-          </div>
-        `).join('');
-      });
-  };
+          `).join('');
+        });
+    }
 
-  function takeCourse(id, name) {
-    const subName = prompt(`確認由您領取【${name}】這堂代課嗎？\n請輸入您的名字：`);
-    if(!subName) return;
-    fetch(`${APP_URL}?action=takeCourse&rowId=${id}&subName=${encodeURIComponent(subName)}`)
-      .then(r => r.text())
-      .then(msg => {
-        alert(msg);
-        location.reload();
-      });
-  }
-</script>
+    function take(id) {
+      const name = prompt("請輸入您的名字：");
+      if(!name) return;
+      fetch(`${APP_URL}?action=takeCourse&rowId=${id}&subName=${encodeURIComponent(name)}`)
+        .then(r => r.text())
+        .then(msg => { alert(msg); load(); });
+    }
+    window.onload = load;
+  </script>
 </body>
 </html>
