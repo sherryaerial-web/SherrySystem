@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sherry Aerial 請假與看板系統</title>
+  <title>Sherry Aerial 系統</title>
   <style>
     :root { --primary: #34495e; --bg: #f8fafb; --success: #27ae60; }
     body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 15px; color: #444; }
@@ -24,6 +24,7 @@
     .tag-wait { background: #fff3e0; color: #e67e22; border: 1px solid #ffe0b2; }
     .tag-done { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
     .submit-btn { width: 100%; background: var(--primary); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; margin-top: 20px; cursor: pointer; }
+    .debug-info { font-size: 11px; color: #ccc; margin-top: 10px; font-family: monospace; }
   </style>
 </head>
 <body>
@@ -37,7 +38,7 @@
   <div id="mainContent" style="display:none;">
     <div class="card">
       <h2>📝 我要請假</h2>
-      <label id="dateLabel">1. 選擇請假日期 (可複選)：</label>
+      <label>1. 選擇請假日期 (可複選)：</label>
       <div id="dateGrid" class="date-grid">載入日期中...</div>
       <div id="courseList" style="margin-top:20px;"></div>
       <button id="submitBtn" class="submit-btn" style="display:none;" onclick="submitLeave()">送出請假登記</button>
@@ -76,38 +77,45 @@
         const s = document.getElementById('teacherSelect');
         s.innerHTML = '<option value="">請選取您的名字</option>' + data.map(t=>`<option value="${t['指導者']}">${t['指導者']}</option>`).join('');
         s.onchange = onIdentityVerified;
+      }).catch(err => {
+        document.getElementById('teacherSelect').innerHTML = "<option>API 連線失敗，請檢查網址或權限</option>";
       });
     };
 
     function onIdentityVerified() {
-      const name = document.getElementById('teacherSelect').value;
+      const name = document.getElementById('teacherSelect').value.trim();
       const mainContent = document.getElementById('mainContent');
+      const dateGrid = document.getElementById('dateGrid');
+      
       if(!name) { mainContent.style.display = 'none'; return; }
       
       mainContent.style.display = 'block';
-      document.getElementById('dateGrid').innerHTML = "讀取課程中...";
+      dateGrid.innerHTML = "正在通訊中...";
       
       fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r=>r.json()).then(data => {
-        // --- 修正後的過濾邏輯：只要是該老師的課都抓出來 ---
-        myTeacherCourses = data.filter(c => c['指導者'] === name && c['日期']);
+        // --- 強化比對邏輯：移除名字兩端空白 ---
+        myTeacherCourses = data.filter(c => {
+          let instructor = String(c['指導者'] || "").trim();
+          return instructor === name && c['日期'];
+        });
         
-        // 抓出所有不重複的日期並排序
         const dates = [...new Set(myTeacherCourses.map(c => c['日期']))].sort((a,b) => new Date(a) - new Date(b));
         
         if (dates.length === 0) {
-          document.getElementById('dateGrid').innerHTML = "<p style='color:#999;font-size:14px;'>找不到您的原始課程資料。</p>";
+          // 除錯模式：如果找不到，顯示後台抓到了哪些欄位名
+          let keys = data.length > 0 ? Object.keys(data[0]).join(', ') : "無資料";
+          dateGrid.innerHTML = `<div><p style='color:#e74c3c;font-size:14px;'>找不到課程。請檢查 Excel 標題列是否包含「指導者」與「日期」。</p><div class='debug-info'>系統目前讀取到的欄位有：${keys}</div></div>`;
         } else {
-          document.getElementById('dateGrid').innerHTML = dates.map(d => `
+          dateGrid.innerHTML = dates.map(d => `
             <label class="date-pill">
               <input type="checkbox" class="date-chk" value="${d}" onchange="renderCourseChoices()">
               <span>${formatSafeDate(d)}</span>
             </label>`).join('');
         }
         
-        // 同步渲染看板
         renderMyBoard(data, name);
       }).catch(err => {
-        document.getElementById('dateGrid').innerHTML = "資料讀取失敗，請確認網路或試算表權限。";
+        dateGrid.innerHTML = "讀取失敗，請確認網址是否正確。";
       });
     }
 
@@ -133,9 +141,10 @@
 
     function renderMyBoard(allData, myName) {
       const board = document.getElementById('board');
-      // 只要 H 欄（代課老師）有資料或 G 欄（狀態）不是空的，就當作已送出的請假紀錄
-      const myLogs = allData.filter(c => c['指導者'] === myName && (c['代課老師'] || c['狀態'] === "確認中"))
-                            .sort((a,b) => new Date(b['日期']) - new Date(a['日期']));
+      const myLogs = allData.filter(c => {
+        let instructor = String(c['指導者'] || "").trim();
+        return instructor === myName && (c['代課老師'] || c['狀態'] === "確認中");
+      }).sort((a,b) => new Date(b['日期']) - new Date(a['日期']));
       
       if(myLogs.length === 0) {
         board.innerHTML = "<div style='text-align:center;color:#999;padding:20px;font-size:14px;'>目前暫無您的請假紀錄。</div>";
