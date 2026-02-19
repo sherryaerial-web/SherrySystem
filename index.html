@@ -3,38 +3,47 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sherry Aerial 請假系統</title>
+  <title>Sherry Aerial 請假與看板系統</title>
   <style>
-    :root { --primary: #34495e; --bg: #f8fafb; --accent: #e67e22; }
+    :root { --primary: #34495e; --bg: #f8fafb; --accent: #e67e22; --success: #27ae60; }
     body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 15px; color: #444; }
     .card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
     h2 { color: var(--primary); font-size: 1.2rem; margin-top: 0; display: flex; align-items: center; gap: 8px; }
     h2::before { content: ""; width: 4px; height: 18px; background: var(--primary); border-radius: 10px; }
-    select { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; appearance: none; }
     
-    /* 日期複選按鈕樣式 */
+    label { font-size: 14px; color: #7f8c8d; margin-bottom: 8px; display: block; }
+    select { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; appearance: none; }
+
+    /* 日期按鈕樣式 */
     .date-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .date-pill { position: relative; cursor: pointer; }
-    .date-pill input { position: absolute; opacity: 0; cursor: pointer; height: 0; width: 0; }
+    .date-pill input { position: absolute; opacity: 0; width: 0; height: 0; }
     .date-pill span { display: inline-block; padding: 10px 14px; background: #fff; border: 1.5px solid #eee; border-radius: 50px; font-size: 14px; transition: 0.2s; }
     .date-pill input:checked + span { background: var(--primary); color: #fff; border-color: var(--primary); }
 
-    .course-item { padding: 12px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 10px; }
-    .board-item { border-bottom: 1px solid #f0f0f0; padding: 15px 0; font-size: 0.95rem; }
-    .tag { font-size: 0.75rem; padding: 3px 8px; border-radius: 6px; margin-left: 5px; font-weight: bold; }
+    /* 看板項目樣式 */
+    .board-item { border-bottom: 1px solid #f0f0f0; padding: 18px 0; }
+    .board-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .board-time { font-size: 1.05rem; font-weight: 800; color: #2c3e50; }
+    .board-detail { color: #7f8c8d; font-size: 0.9rem; line-height: 1.5; }
+    
+    /* 標籤樣式 */
+    .tag { font-size: 0.75rem; padding: 4px 10px; border-radius: 50px; font-weight: bold; }
     .tag-wait { background: #fff3e0; color: #e67e22; border: 1px solid #ffe0b2; }
     .tag-done { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
-    .submit-btn { width: 100%; background: var(--primary); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; margin-top: 15px; cursor: pointer; }
+
+    .submit-btn { width: 100%; background: var(--primary); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; margin-top: 20px; cursor: pointer; }
   </style>
 </head>
 <body>
+
   <div class="card">
-    <h2>📝 我要請假</h2>
-    <label style="font-size:14px; color:#7f8c8d;">1. 您是哪位老師？</label>
+    <h2>📝 請假登記</h2>
+    <label>1. 您是哪位老師？</label>
     <select id="teacherSelect"><option>載入老師名單中...</option></select>
     
-    <div id="dateSection" style="display:none;">
-      <label style="font-size:14px; color:#7f8c8d;">2. 選擇請假日期 (可複選)：</label>
+    <div id="step2" style="display:none;">
+      <label>2. 選擇請假日期 (可複選)：</label>
       <div id="dateGrid" class="date-grid"></div>
       <div id="courseList" style="margin-top:20px;"></div>
       <button id="submitBtn" class="submit-btn" style="display:none;" onclick="submitLeave()">送出請假登記</button>
@@ -43,12 +52,12 @@
 
   <div class="card">
     <h2>📋 代課進度看板</h2>
-    <div id="board">正在同步最新進度...</div>
+    <div id="board">正在讀取最新資料...</div>
   </div>
 
   <script>
     const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec";
-    let myAllCourses = [];
+    let myTeacherCourses = [];
 
     function formatSafeDate(d) {
       if (!d) return "";
@@ -79,23 +88,26 @@
 
     function onTeacherSelected() {
       const name = document.getElementById('teacherSelect').value;
-      if(!name) { document.getElementById('dateSection').style.display = 'none'; return; }
+      const step2 = document.getElementById('step2');
+      if(!name) { step2.style.display = 'none'; return; }
       
-      document.getElementById('dateSection').style.display = 'block';
       fetch(`${APP_URL}?action=getCourse`).then(r=>r.json()).then(data => {
-        myAllCourses = data.filter(c => c['指導者'] === name);
-        const dates = [...new Set(myAllCourses.map(c => c['日期']))].sort((a,b) => new Date(a) - new Date(b));
+        myTeacherCourses = data.filter(c => c['指導者'] === name);
+        // 按日期時間邏輯排序
+        const dates = [...new Set(myTeacherCourses.map(c => c['日期']))].sort((a,b) => new Date(a) - new Date(b));
         
         document.getElementById('dateGrid').innerHTML = dates.map(d => `
           <label class="date-pill">
-            <input type="checkbox" class="date-chk" value="${d}" onchange="renderCourseList()">
+            <input type="checkbox" class="date-chk" value="${d}" onchange="renderCourseChoices()">
             <span>${formatSafeDate(d)}</span>
           </label>`).join('');
-        renderCourseList();
+        
+        step2.style.display = 'block';
+        renderCourseChoices();
       });
     }
 
-    function renderCourseList() {
+    function renderCourseChoices() {
       const selectedDates = Array.from(document.querySelectorAll('.date-chk:checked')).map(el => el.value);
       const container = document.getElementById('courseList');
       const submitBtn = document.getElementById('submitBtn');
@@ -106,11 +118,11 @@
         return;
       }
 
-      const filtered = myAllCourses.filter(c => selectedDates.includes(c['日期']));
-      container.innerHTML = filtered.map(c => `
-        <div class="course-item">
-          <input type="checkbox" class="chk-course" style="width:18px; height:18px;" data-raw='${JSON.stringify(c)}'> 
-          <span><strong>${formatSafeDate(c['日期'])}</strong> | ${formatSafeTime(c['時間'])} - ${c['課程']}</span>
+      const filtered = myTeacherCourses.filter(c => selectedDates.includes(c['日期']));
+      container.innerHTML = `<label style="margin-top:15px;">3. 勾選欲請假的時段：</label>` + filtered.map(c => `
+        <div style="padding:12px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px;">
+          <input type="checkbox" class="chk-item" style="width:18px; height:18px;" data-raw='${JSON.stringify(c)}'> 
+          <span><strong>${formatSafeDate(c['日期'])}</strong> ${formatSafeTime(c['時間'])} - ${c['課程']}</span>
         </div>`).join('');
       submitBtn.style.display = 'block';
     }
@@ -121,14 +133,20 @@
         const items = data.filter(c => c['指導者'] && c['指導者'] !== "指導者")
                           .sort((a,b) => new Date(b['日期']) - new Date(a['日期']));
         
-        if(items.length === 0) { board.innerHTML = "目前暫無請假記錄"; return; }
+        if(items.length === 0) { board.innerHTML = "目前暫無資料"; return; }
 
         board.innerHTML = items.map(l => {
-          const statusTag = l['代課老師'] ? `<span class="tag tag-done">✔ ${l['代課老師']} 已領取</span>` : `<span class="tag tag-wait">⏳ 徵求中</span>`;
+          const status = l['代課老師'] ? `<span class="tag tag-done">已由 ${l['代課老師']} 領取</span>` : `<span class="tag tag-wait">⏳ 確認中</span>`;
           return `
           <div class="board-item">
-            <div><strong>${formatSafeDate(l['日期'])}  ${formatSafeTime(l['時間'])}</strong> ${statusTag}</div>
-            <div style="color:#7f8c8d; font-size:0.85rem;">課程：${l['課程']} (${l['指導者']} 老師請假)</div>
+            <div class="board-header">
+              <span class="board-time">${formatSafeDate(l['日期'])} ${formatSafeTime(l['時間'])}</span>
+              ${status}
+            </div>
+            <div class="board-detail">
+              課程：${l['課程']}<br>
+              請假老師：${l['指導者']} 老師
+            </div>
           </div>`;
         }).join('');
       });
@@ -136,13 +154,13 @@
 
     function submitLeave() {
       const name = document.getElementById('teacherSelect').value;
-      const chks = document.querySelectorAll('.chk-course:checked');
-      if (chks.length === 0) return alert("請勾選要請假的課程時段");
-      if (!confirm("確定要送出這些請假登記嗎？")) return;
+      const chks = document.querySelectorAll('.chk-item:checked');
+      if (chks.length === 0) return alert("請至少勾選一個課程時段");
+      if (!confirm("確定送出請假申請？")) return;
       
       const selected = Array.from(chks).map(el => JSON.parse(el.getAttribute('data-raw')));
       fetch(`${APP_URL}?instructor=${encodeURIComponent(name)}&items=${encodeURIComponent(JSON.stringify(selected))}`)
-        .then(() => { alert("請假登記成功！"); location.reload(); });
+        .then(() => { alert("登記成功！"); location.reload(); });
     }
   </script>
 </body>
