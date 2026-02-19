@@ -8,54 +8,54 @@
     :root { --primary: #34495e; --bg: #f8fafb; --success: #27ae60; }
     body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 15px; color: #444; }
     .card { background: white; padding: 22px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
-    h2 { color: var(--primary); font-size: 1.25rem; margin-top: 0; display: flex; align-items: center; gap: 10px; }
-    h2::before { content: ""; width: 5px; height: 20px; background: var(--primary); border-radius: 10px; }
+    h2 { color: var(--primary); font-size: 1.2rem; margin-top: 0; display: flex; align-items: center; gap: 8px; }
+    h2::before { content: ""; width: 4px; height: 18px; background: var(--primary); border-radius: 10px; }
     
-    label { font-size: 14px; color: #7f8c8d; margin-bottom: 10px; display: block; font-weight: 500; }
-    select { width: 100%; padding: 14px; margin-bottom: 10px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; appearance: none; cursor: pointer; }
+    label { font-size: 14px; color: #7f8c8d; margin-bottom: 8px; display: block; }
+    select { width: 100%; padding: 12px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; margin-bottom: 10px; background: #fff; }
 
-    /* 課程卡片樣式 */
+    /* 卡片設計優化 */
     .course-card { 
+      background: #fff;
       border: 1px solid #f0f0f0; 
-      padding: 18px; 
-      border-radius: 15px; 
+      padding: 20px; 
+      border-radius: 16px; 
       margin-bottom: 15px; 
       display: flex; 
       justify-content: space-between; 
-      align-items: center; 
+      align-items: center;
       transition: 0.2s;
     }
-    .course-card:hover { border-color: var(--primary); background: #fdfdfd; }
-    .course-info { flex-grow: 1; }
-    .course-date { font-size: 1.1rem; font-weight: 700; color: #2c3e50; margin-bottom: 4px; }
-    .course-detail { font-size: 14px; color: #7f8c8d; }
-    .course-instructor { color: #34495e; font-weight: 600; background: #f0f2f5; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+    .course-info { flex: 1; }
+    
+    /* 1. 課程名稱：最醒目 */
+    .course-title { font-size: 1.15rem; font-weight: 800; color: #2c3e50; margin-bottom: 4px; display: block; }
+    
+    /* 日期時間與指導者 */
+    .course-meta { font-size: 14px; color: #7f8c8d; display: flex; flex-direction: column; gap: 4px; }
+    .instructor-tag { display: inline-block; background: #f0f2f5; color: #576574; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; width: fit-content; }
+    .time-text { color: #34495e; font-weight: 500; }
 
-    /* 領取按鈕 */
     .claim-btn { 
       background: var(--success); 
       color: white; 
       border: none; 
-      padding: 10px 20px; 
-      border-radius: 10px; 
+      padding: 12px 24px; 
+      border-radius: 12px; 
       font-weight: bold; 
       cursor: pointer; 
-      font-size: 14px;
-      white-space: nowrap;
+      font-size: 15px;
       margin-left: 15px;
+      box-shadow: 0 4px 10px rgba(39, 174, 96, 0.2);
     }
-    .claim-btn:active { transform: scale(0.95); opacity: 0.9; }
-    .loading-text { text-align: center; color: #bdc3c7; padding: 40px; font-size: 14px; }
-    
-    /* 空狀態提示 */
-    .empty-msg { text-align: center; padding: 40px; color: #95a5a6; font-size: 15px; }
+    .claim-btn:active { transform: scale(0.95); }
+    .empty-msg { text-align: center; padding: 40px; color: #bdc3c7; }
   </style>
 </head>
 <body>
 
   <div class="card">
     <h2>👤 領取身份</h2>
-    <label>請選擇您的名字 (代課老師)：</label>
     <select id="meSelect" onchange="loadAvailableCourses()">
       <option value="">-- 我是哪位老師？ --</option>
     </select>
@@ -63,15 +63,13 @@
 
   <div class="card">
     <h2>📢 待領取課表</h2>
-    <div id="listArea"><div class="loading-text">請先選擇您的身份...</div></div>
+    <div id="listArea"><div class="empty-msg">請先選擇您的身份...</div></div>
   </div>
 
   <script>
     const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec";
-    let allPendingCourses = [];
 
     window.onload = () => {
-      // 1. 載入老師名單
       fetch(`${APP_URL}?action=getTeachers`).then(r => r.json()).then(data => {
         const s = document.getElementById('meSelect');
         s.innerHTML += data.map(t => `<option value="${t['指導者']}">${t['指導者']}</option>`).join('');
@@ -81,27 +79,19 @@
     function loadAvailableCourses() {
       const myName = document.getElementById('meSelect').value;
       const area = document.getElementById('listArea');
-      
-      if (!myName) {
-        area.innerHTML = '<div class="loading-text">請先選擇您的身份...</div>';
-        return;
-      }
+      if (!myName) return;
 
-      area.innerHTML = '<div class="loading-text">搜尋中...</div>';
+      area.innerHTML = '<div class="empty-msg">搜尋中...</div>';
 
-      // 2. 載入看板資料 (工作表1)
       fetch(`${APP_URL}?action=getBoard`).then(r => r.json()).then(data => {
-        // 過濾邏輯：
-        // 1. 狀態必須是「確認中」
-        // 2. 指導者「不能」是目前選取的老師 (本人)
-        // 3. 還沒有代課老師領取
+        // 過濾：1.狀態確認中 2.非本人 3.尚未被領取
         const available = data.filter(c => 
           c['狀態'] === '確認中' && 
           String(c['指導者']).trim() !== myName && 
           (!c['代課老師'] || c['代課老師'] === "")
         );
 
-        // 排序：日期早的排前面
+        // 排序：早日期排前面
         available.sort((a, b) => {
           const valA = new Date(a['日期'].replace(/\//g, '-') + ' ' + (a['時間'].includes('T') ? a['時間'].split('T')[1].substring(0,5) : a['時間'])).getTime();
           const valB = new Date(b['日期'].replace(/\//g, '-') + ' ' + (b['時間'].includes('T') ? b['時間'].split('T')[1].substring(0,5) : b['時間'])).getTime();
@@ -123,17 +113,17 @@
     function renderList(list, myName) {
       const area = document.getElementById('listArea');
       if (list.length === 0) {
-        area.innerHTML = '<div class="empty-msg">🌵 目前沒有可領取的代課邀請<br>(或剩餘課程皆為您的請假)</div>';
+        area.innerHTML = '<div class="empty-msg">🌵 目前沒有可領取的代課邀請</div>';
         return;
       }
 
       area.innerHTML = list.map(c => `
         <div class="course-card">
           <div class="course-info">
-            <div class="course-date">${formatDateWithDay(c['日期'])} ${c['時間']}</div>
-            <div class="course-detail">
-              <span class="course-instructor">原指導者：${c['指導者']}</span>
-              <div style="margin-top:5px;">課程：${c['課程']}</div>
+            <span class="course-title">${c['課程']}</span>
+            <div class="course-meta">
+              <span class="time-text">🗓️ ${formatDateWithDay(c['日期'])} ${c['時間']}</span>
+              <span class="instructor-tag">原指導者：${c['指導者']}</span>
             </div>
           </div>
           <button class="claim-btn" onclick="claimCourse('${c['日期']}', '${c['時間']}', '${c['指導者']}')">領取</button>
@@ -143,16 +133,16 @@
 
     function claimCourse(date, time, instructor) {
       const myName = document.getElementById('meSelect').value;
-      if (!confirm(`確定要領取 ${instructor} 老師在 ${date} ${time} 的課程嗎？`)) return;
+      if (!confirm(`確定要領取課程嗎？`)) return;
 
       const url = `${APP_URL}?action=subClaim&date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}&instructor=${encodeURIComponent(instructor)}&subTeacher=${encodeURIComponent(myName)}`;
       
       fetch(url).then(r => r.json()).then(res => {
         if (res.status === "success") {
           alert("領取成功！");
-          loadAvailableCourses(); // 重新整理列表
+          loadAvailableCourses();
         } else {
-          alert("領取失敗：" + res.message);
+          alert("錯誤：" + res.message);
         }
       });
     }
