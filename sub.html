@@ -79,7 +79,6 @@
       }
       
       fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r => r.json()).then(data => {
-        // 【核心改動】過濾出：狀態為徵求/確認中、無代課老師、且「原指導者不是目前登入的老師」
         allAvailableCourses = data.filter(c => 
           (c['狀態'] === '確認中' || c['狀態'] === '徵求中') && 
           (!c['代課老師'] || c['代課老師'] === "") &&
@@ -119,12 +118,13 @@
         return;
       }
 
+      // --- 在這裡交換了日期與時間的順序 ---
       container.innerHTML = filtered.map(c => `
         <div class="course-card">
           <div class="course-title">${c['課程']}</div>
           <div class="course-info">
-            時段：${formatSafeTime(c['時間'])} <br>
             日期：${formatSafeDate(c['日期'])} <br>
+            時段：${formatSafeTime(c['時間'])} <br>
             <span class="teacher-small">原指導：${c['指導者']}</span>
           </div>
           <button class="btn-take" onclick="takeCourse('${c.rowId}', '${c['課程']}')">領取此堂代課</button>
