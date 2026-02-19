@@ -3,50 +3,125 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>代課領取端</title>
+  <title>Sherry Aerial 代課領取系統</title>
   <style>
-    body { font-family: sans-serif; background: #f4f7f6; padding: 15px; }
-    .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-    .item { border: 1px solid #eee; padding: 15px; border-radius: 10px; margin-top: 15px; }
-    .btn { width: 100%; background: #27ae60; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    :root { --success: #27ae60; --primary: #34495e; --bg: #f8fafb; }
+    body { font-family: -apple-system, "PingFang TC", sans-serif; background: var(--bg); padding: 15px; color: #444; }
+    .card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    h2 { color: var(--primary); font-size: 1.2rem; margin-top: 0; display: flex; align-items: center; gap: 8px; }
+    h2::before { content: ""; width: 4px; height: 18px; background: var(--primary); border-radius: 10px; }
+    
+    label { font-size: 14px; color: #7f8c8d; margin-bottom: 8px; display: block; font-weight: 500; }
+    select { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; appearance: none; }
+    
+    /* 日期複選樣式 */
+    .date-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .date-pill { position: relative; }
+    .date-pill input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+    .date-pill span { display: inline-block; padding: 10px 14px; background: #fff; border: 1.5px solid #eee; border-radius: 50px; font-size: 14px; transition: 0.2s; }
+    .date-pill input:checked + span { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    /* 課程卡片樣式 */
+    .course-card { background: white; border-radius: 18px; padding: 18px; margin-bottom: 15px; border: 1px solid rgba(0,0,0,0.03); box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+    .course-title { font-size: 1.15rem; font-weight: 800; color: #2c3e50; margin-bottom: 8px; }
+    .course-info { font-size: 0.9rem; color: #7f8c8d; line-height: 1.6; margin-bottom: 15px; }
+    .teacher-small { font-size: 0.75rem; color: #bdc3c7; background: #f8f9fa; padding: 2px 6px; border-radius: 4px; }
+    
+    .btn-take { width: 100%; background: var(--success); color: white; border: none; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(39, 174, 96, 0.2); }
+    .btn-take:active { transform: scale(0.97); }
   </style>
 </head>
 <body>
+
   <div class="card">
-    <h2>🙋 待領取代課清單</h2>
-    <div id="list">讀取中...</div>
+    <h2>代課老師報到</h2>
+    <label>您是哪位老師？</label>
+    <select id="myIdentity"><option value="">載入中...</option></select>
+    
+    <div id="step2" style="display:none;">
+      <label>選擇您可以代課的日期 (可複選)：</label>
+      <div id="dateGrid" class="date-container"></div>
+    </div>
   </div>
+
+  <div id="courseContainer"></div>
 
   <script>
     const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec";
+    let allAvailableCourses = [];
 
-    function load() {
-      const container = document.getElementById('list');
-      fetch(`${APP_URL}?action=getCourse&isAdmin=true`)
-        .then(r => r.json())
-        .then(data => {
-          const available = data.filter(c => c['狀態'] === '確認中' && (!c['代課老師'] || c['代課老師'] === ""));
-          if (available.length === 0) { container.innerHTML = "目前暫無空缺課程。"; return; }
-          container.innerHTML = available.map(item => `
-            <div class="item">
-              <strong>${item['指導者']} 老師</strong><br>
-              課程：${item['課程']}<br>
-              時間：${item['日期']} (${item['時間']})<br>
-              <div style="color:orange;">📢 優先詢問：${item['最後詢問對象'] || '等候中'}</div>
-              <button class="btn" onclick="take('${item.rowId}')">確認領取代課</button>
-            </div>
-          `).join('');
+    window.onload = () => {
+      fetch(`${APP_URL}?action=getTeachers`).then(r => r.json()).then(data => {
+        const select = document.getElementById('myIdentity');
+        select.innerHTML = '<option value="">請選取您的名字</option>' + 
+          data.map(t => `<option value="${t['指導者']}">${t['指導者']}</option>`).join('');
+        select.onchange = onIdentitySelected;
+      });
+    };
+
+    function onIdentitySelected() {
+      const name = document.getElementById('myIdentity').value;
+      if (!name) return;
+      
+      fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r => r.json()).then(data => {
+        // 過濾掉已有代課老師或已完成的課
+        allAvailableCourses = data.filter(c => 
+          (c['狀態'] === '確認中' || c['狀態'] === '徵求中') && (!c['代課老師'] || c['代課老師'] === "")
+        );
+
+        const dates = [...new Set(allAvailableCourses.map(c => c['日期']))].sort();
+        const dateGrid = document.getElementById('dateGrid');
+        
+        dateGrid.innerHTML = dates.map(d => `
+          <label class="date-pill">
+            <input type="checkbox" class="date-chk" value="${d}" onchange="renderCourses()">
+            <span>${d.split('-')[1]}/${d.split('-')[2]}</span>
+          </label>`).join('');
+        
+        document.getElementById('step2').style.display = 'block';
+        renderCourses();
+      });
+    }
+
+    function renderCourses() {
+      const selectedDates = Array.from(document.querySelectorAll('.date-chk:checked')).map(el => el.value);
+      const container = document.getElementById('courseContainer');
+      const filtered = allAvailableCourses.filter(c => selectedDates.includes(c['日期']));
+      
+      if (selectedDates.length === 0) {
+        container.innerHTML = "";
+        return;
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = "<div class='card' style='text-align:center;color:#999;font-size:14px;'>選取日期暫無待領課程</div>";
+        return;
+      }
+
+      container.innerHTML = filtered.map(c => `
+        <div class="course-card">
+          <div class="course-title">${c['課程']}</div>
+          <div class="course-info">
+            時段：${c['時間']} <br>
+            日期：${c['日期']} <br>
+            <span class="teacher-small">原指導：${c['指導者']}</span>
+          </div>
+          <button class="btn-take" onclick="takeCourse('${c.rowId}', '${c['課程']}')">領取此堂代課</button>
+        </div>
+      `).join('');
+    }
+
+    function takeCourse(rowId, courseName) {
+      const myName = document.getElementById('myIdentity').value;
+      if (!confirm(`確認由您（${myName} 老師）領取「${courseName}」代課嗎？`)) return;
+
+      fetch(`${APP_URL}?action=takeCourse&rowId=${rowId}&subName=${encodeURIComponent(myName)}`)
+        .then(r => r.text())
+        .then(msg => {
+          alert("代課成功！系統已更新資料。");
+          location.reload();
         });
     }
-
-    function take(id) {
-      const name = prompt("請輸入您的名字：");
-      if(!name) return;
-      fetch(`${APP_URL}?action=takeCourse&rowId=${id}&subName=${encodeURIComponent(name)}`)
-        .then(r => r.text())
-        .then(msg => { alert(msg); load(); });
-    }
-    window.onload = load;
   </script>
 </body>
 </html>
