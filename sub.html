@@ -15,51 +15,35 @@
 <body>
   <div class="card">
     <h2 id="welcome">老師您好</h2>
-    <p>Sherry 邀請您代課，請勾選您可以承接的時段：</p>
+    <p>以下是 Sherry 邀請您代課的時段，請勾選您可以承接的課程：</p>
     <div id="list">讀取課程中...</div>
-    <button class="btn" onclick="submitClaim()">確認提交</button>
+    <button class="btn" onclick="submitClaim()">確認提交勾選</button>
     <button class="decline-btn" onclick="submitDecline()">暫不方便，全部婉拒</button>
   </div>
-
   <script>
     const APP_URL = "https://script.google.com/macros/s/AKfycbyJADHe_DZdNIbfv_KPewAcBekEond-5Fw63i-RWCd1mHl_O9uGAQ-LTnzENZshjnhe/exec";
     const params = new URLSearchParams(window.location.search);
     const tName = params.get('name');
     const ids = params.get('ids') ? params.get('ids').split(',') : [];
-
     document.getElementById('welcome').innerText = `${tName} 老師您好`;
-
     fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r => r.json()).then(data => {
       const filtered = data.filter(d => ids.includes(String(d.rowId)));
       document.getElementById('list').innerHTML = filtered.map(c => `
         <div class="course-item">
           <input type="checkbox" class="claim-chk" value="${c.rowId}">
-          <div>
-            <strong>${new Date(c['日期']).toLocaleDateString('zh-TW')} ${c['時間']}</strong><br>
-            <span>${c['課程']} (原師：${c['指導者']})</span>
-          </div>
+          <div><strong>${new Date(c['日期']).toLocaleDateString('zh-TW')} ${c['時間']}</strong><br>${c['課程']}</div>
         </div>`).join('');
     });
-
     function submitClaim() {
       const selectedIds = Array.from(document.querySelectorAll('.claim-chk:checked')).map(el => el.value);
       if (selectedIds.length === 0) return alert("請至少勾選一堂課喔！");
-      Promise.all(selectedIds.map(id => 
-        fetch(`${APP_URL}?action=updateStatus&rowId=${id}&status=已成交&subTeacher=${encodeURIComponent(tName)}`)
-      )).then(() => {
-        alert("認領完成！感謝老師！");
-        window.close();
-      });
+      Promise.all(selectedIds.map(id => fetch(`${APP_URL}?action=updateStatus&rowId=${id}&status=已成交&subTeacher=${encodeURIComponent(tName)}`)))
+      .then(() => { alert("認領完成！感謝老師！"); window.close(); });
     }
-
     function submitDecline() {
-      if(!confirm("確定要婉拒這幾堂課嗎？")) return;
-      Promise.all(ids.map(id => 
-        fetch(`${APP_URL}?action=updateStatus&rowId=${id}&status=已婉拒`)
-      )).then(() => {
-        alert("已收到您的回覆，辛苦了！");
-        window.close();
-      });
+      if(!confirm("確定婉拒嗎？")) return;
+      Promise.all(ids.map(id => fetch(`${APP_URL}?action=updateStatus&rowId=${id}&status=已婉拒`)))
+      .then(() => { alert("已收到回覆，辛苦了！"); window.close(); });
     }
   </script>
 </body>
