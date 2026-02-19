@@ -5,35 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sherry Aerial 請假與看板系統</title>
   <style>
-    :root { --primary: #34495e; --bg: #f8fafb; --accent: #e67e22; --success: #27ae60; }
+    :root { --primary: #34495e; --bg: #f8fafb; --success: #27ae60; }
     body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 15px; color: #444; }
     .card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
     h2 { color: var(--primary); font-size: 1.2rem; margin-top: 0; display: flex; align-items: center; gap: 8px; }
     h2::before { content: ""; width: 4px; height: 18px; background: var(--primary); border-radius: 10px; }
-    
     label { font-size: 14px; color: #7f8c8d; margin-bottom: 8px; display: block; }
     select { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; appearance: none; }
-
-    /* 日期按鈕樣式 */
     .date-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .date-pill { position: relative; cursor: pointer; }
     .date-pill input { position: absolute; opacity: 0; width: 0; height: 0; }
     .date-pill span { display: inline-block; padding: 10px 14px; background: #fff; border: 1.5px solid #eee; border-radius: 50px; font-size: 14px; transition: 0.2s; }
     .date-pill input:checked + span { background: var(--primary); color: #fff; border-color: var(--primary); }
-
-    /* 看板項目樣式 */
     .board-item { border-bottom: 1px solid #f0f0f0; padding: 18px 0; }
     .board-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .board-time { font-size: 1.05rem; font-weight: 800; color: #2c3e50; }
-    .board-detail { color: #7f8c8d; font-size: 0.9rem; line-height: 1.5; }
-    
-    /* 標籤樣式 */
     .tag { font-size: 0.75rem; padding: 4px 10px; border-radius: 50px; font-weight: bold; }
     .tag-wait { background: #fff3e0; color: #e67e22; border: 1px solid #ffe0b2; }
     .tag-done { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
-
     .submit-btn { width: 100%; background: var(--primary); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; margin-top: 20px; cursor: pointer; }
-    .empty-msg { text-align: center; color: #999; padding: 20px; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -47,15 +37,15 @@
   <div id="mainContent" style="display:none;">
     <div class="card">
       <h2>📝 我要請假</h2>
-      <label>1. 選擇請假日期 (可複選)：</label>
-      <div id="dateGrid" class="date-grid"></div>
+      <label id="dateLabel">1. 選擇請假日期 (可複選)：</label>
+      <div id="dateGrid" class="date-grid">載入日期中...</div>
       <div id="courseList" style="margin-top:20px;"></div>
       <button id="submitBtn" class="submit-btn" style="display:none;" onclick="submitLeave()">送出請假登記</button>
     </div>
 
     <div class="card">
       <h2>📋 我的代課進度看板</h2>
-      <div id="board">讀取資料中...</div>
+      <div id="board">正在讀取進度...</div>
     </div>
   </div>
 
@@ -95,21 +85,29 @@
       if(!name) { mainContent.style.display = 'none'; return; }
       
       mainContent.style.display = 'block';
+      document.getElementById('dateGrid').innerHTML = "讀取課程中...";
       
-      // 同步載入請假流程與看板
       fetch(`${APP_URL}?action=getCourse&isAdmin=true`).then(r=>r.json()).then(data => {
-        // 1. 處理請假流程資料
-        myTeacherCourses = data.filter(c => c['指導者'] === name && !c['填單時間']); // 過濾出原始課表內容
+        // --- 修正後的過濾邏輯：只要是該老師的課都抓出來 ---
+        myTeacherCourses = data.filter(c => c['指導者'] === name && c['日期']);
+        
+        // 抓出所有不重複的日期並排序
         const dates = [...new Set(myTeacherCourses.map(c => c['日期']))].sort((a,b) => new Date(a) - new Date(b));
         
-        document.getElementById('dateGrid').innerHTML = dates.map(d => `
-          <label class="date-pill">
-            <input type="checkbox" class="date-chk" value="${d}" onchange="renderCourseChoices()">
-            <span>${formatSafeDate(d)}</span>
-          </label>`).join('');
+        if (dates.length === 0) {
+          document.getElementById('dateGrid').innerHTML = "<p style='color:#999;font-size:14px;'>找不到您的原始課程資料。</p>";
+        } else {
+          document.getElementById('dateGrid').innerHTML = dates.map(d => `
+            <label class="date-pill">
+              <input type="checkbox" class="date-chk" value="${d}" onchange="renderCourseChoices()">
+              <span>${formatSafeDate(d)}</span>
+            </label>`).join('');
+        }
         
-        // 2. 處理看板資料 (顯示該老師的所有請假紀錄)
+        // 同步渲染看板
         renderMyBoard(data, name);
+      }).catch(err => {
+        document.getElementById('dateGrid').innerHTML = "資料讀取失敗，請確認網路或試算表權限。";
       });
     }
 
@@ -135,12 +133,12 @@
 
     function renderMyBoard(allData, myName) {
       const board = document.getElementById('board');
-      // 只篩選出該位老師的請假紀錄
-      const myLogs = allData.filter(c => c['指導者'] === myName && c['填單時間'])
+      // 只要 H 欄（代課老師）有資料或 G 欄（狀態）不是空的，就當作已送出的請假紀錄
+      const myLogs = allData.filter(c => c['指導者'] === myName && (c['代課老師'] || c['狀態'] === "確認中"))
                             .sort((a,b) => new Date(b['日期']) - new Date(a['日期']));
       
       if(myLogs.length === 0) {
-        board.innerHTML = "<div class='empty-msg'>目前暫無您的請假紀錄。</div>";
+        board.innerHTML = "<div style='text-align:center;color:#999;padding:20px;font-size:14px;'>目前暫無您的請假紀錄。</div>";
         return;
       }
 
@@ -152,7 +150,7 @@
             <span class="board-time">${formatSafeDate(l['日期'])} ${formatSafeTime(l['時間'])}</span>
             ${status}
           </div>
-          <div class="board-detail">課程名稱：${l['課程']}</div>
+          <div style="color:#7f8c8d; font-size:0.9rem;">課程：${l['課程']}</div>
         </div>`;
       }).join('');
     }
