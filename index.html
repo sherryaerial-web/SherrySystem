@@ -13,14 +13,12 @@
     label { font-size: 14px; color: #7f8c8d; margin-bottom: 10px; display: block; font-weight: 500; }
     select { width: 100%; padding: 14px; margin-bottom: 20px; border-radius: 12px; border: 1.5px solid #eee; font-size: 16px; background: #fff; appearance: none; }
     
-    /* 膠囊日期選擇區 */
     .date-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; padding: 5px 0; }
     .date-pill { position: relative; }
     .date-pill input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; z-index: 1; }
     .date-pill span { display: inline-block; padding: 10px 14px; background: #fff; border: 1.5px solid #eee; border-radius: 50px; font-size: 14px; color: #555; transition: 0.2s; text-align: center; min-width: 75px; }
     .date-pill input:checked + span { background: var(--primary); color: #fff; border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 4px 10px rgba(52, 73, 94, 0.2); }
 
-    /* 課程列表區 */
     .course-list { background: #fcfcfc; border-radius: 15px; padding: 5px 15px; border: 1px dashed #eee; }
     .course-item { display: flex; align-items: center; padding: 16px 0; border-bottom: 1px solid #f1f1f1; }
     .course-item input { width: 22px; height: 22px; margin-right: 15px; accent-color: var(--primary); }
@@ -31,7 +29,6 @@
     button.submit-btn { width: 100%; padding: 16px; border-radius: 12px; border: none; font-size: 17px; font-weight: 600; cursor: pointer; background: var(--primary); color: white; margin-top: 15px; }
     button.submit-btn:disabled { background: #ccc; }
 
-    /* --- 分組看板專用樣式 --- */
     .teacher-group { margin-bottom: 25px; border-radius: 15px; overflow: hidden; border: 1px solid #eee; background: #fff; }
     .teacher-header { background: #f1f4f7; padding: 10px 15px; font-weight: bold; color: var(--primary); font-size: 14px; border-bottom: 1px solid #eee; }
     .board-item { display: flex; justify-content: space-between; padding: 12px 15px; border-bottom: 1px solid #f9f9f9; align-items: center; }
@@ -57,7 +54,7 @@
 
   <div class="card">
     <h2>代課進度看板</h2>
-    <div id="board">讀取中...</div>
+    <div id="board">目前無請假記錄</div>
   </div>
 
   <script>
@@ -65,12 +62,10 @@
     let allCourses = []; 
     const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
 
-    // 萬能日期解析 (修正 NaN 亂碼問題)
     function safeDate(d) {
       if (!d) return null;
       let date = new Date(d);
       if (isNaN(date.getTime())) {
-          // 處理 Excel 奇怪的日期字串
           let s = String(d).split('T')[0].replace(/-/g, '/');
           date = new Date(s);
       }
@@ -143,11 +138,16 @@
 
     function renderBoard() {
       const board = document.getElementById('board');
-      const items = allCourses.filter(d => d['指導者'] !== "指導者" && d['指導者']).slice(-30).reverse();
+      // 重要修正：只顯示「有代課老師」或「狀態不是空白」的記錄
+      // 這邊判斷條件：只要「狀態」有填寫內容，就代表老師發出了請假請求
+      const items = allCourses.filter(d => 
+        d['指導者'] !== "指導者" && 
+        d['指導者'] && 
+        (d['代課老師'] || (d['狀態'] && d['狀態'].trim() !== ""))
+      ).slice(-50).reverse();
       
-      if (items.length === 0) return board.innerHTML = "目前暫無記錄";
+      if (items.length === 0) return board.innerHTML = "目前暫無請假記錄";
 
-      // 按老師名稱分組
       const groups = items.reduce((acc, obj) => {
         const key = obj['指導者'];
         if (!acc[key]) acc[key] = [];
@@ -161,7 +161,7 @@
           ${groups[teacher].map(l => {
             const d = safeDate(l['日期']);
             const isDone = !!l['代課老師'];
-            const dateDisplay = d ? `${d.getMonth()+1}/${d.getDate()} (${weekDays[d.getDay()]})` : "格式錯誤";
+            const dateDisplay = d ? `${d.getMonth()+1}/${d.getDate()} (${weekDays[d.getDay()]})` : "日期異常";
             return `
               <div class="board-item">
                 <div>
@@ -169,7 +169,7 @@
                   <small style="color:#999;">${formatTime(l['時間'])}</small>
                 </div>
                 <span class="status-badge" style="background:${isDone?'#e8f5e9':'#fff3e0'}; color:${isDone?'#2e7d32':'#ef6c00'};">
-                  ${isDone ? '已結案' : (l['狀態'] === '詢問中' ? '洽詢中' : '徵求中')}
+                  ${isDone ? '已代課' : (l['狀態'] === '詢問中' ? '洽詢中' : '徵求中')}
                 </span>
               </div>
             `;
